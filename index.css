@@ -1,0 +1,633 @@
+@import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap");
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Inconsolata", monospace;
+  font-size: 14px;
+  color: white;
+  user-select: none;
+  -webkit-user-select: none;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  overflow: hidden;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  color: white;
+  background: transparent;
+  font-family: "Inconsolata", monospace;
+  padding: 10px;
+  font-size: 1em;
+}
+
+button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+#info-left,
+#info-right {
+  position: absolute;
+  top: 20px;
+}
+
+#info-left {
+  left: 25px;
+}
+
+#info-right {
+  right: 25px;
+  text-align: right;
+}
+
+#bomb-grab-area {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: transparent;
+  cursor: grab;
+}
+
+#instructions,
+#congratulations {
+  position: absolute;
+  transition: visibility 0s, opacity 0.5s linear;
+}
+
+@media (min-height: 535px) {
+  #instructions {
+    min-height: 200px;
+  }
+}
+
+#congratulations {
+  background-color: rgba(255, 255, 255, 0.9);
+  color: black;
+  padding: 50px 80px;
+  opacity: 0;
+  visibility: hidden;
+  max-width: 300px;
+  backdrop-filter: blur(5px);
+}
+
+#congratulations p a {
+  color: inherit;
+}
+
+#congratulations button {
+  border: 1px solid rgba(0, 0, 0, 0.9);
+  color: inherit;
+}
+
+#settings {
+  position: absolute;
+  top: calc(20px + 16.385px - 10px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  right: 11em;
+}
+
+#settings,
+#info-left,
+#info-right {
+  opacity: 0;
+  transition: opacity 3s;
+}
+
+/* Health bar styles */
+.health-container {
+  margin-top: 10px;
+}
+
+.health-bar {
+  height: 12px;
+  background-color: #4CAF50; /* Green color for health */
+  width: 100%;
+  border-radius: 5px;
+  margin-bottom: 5px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+/* Health levels colors */
+.health-bar.danger {
+  background-color: #f44336; /* Red for low health */
+}
+
+.health-bar.warning {
+  background-color: #ff9800; /* Orange for medium health */
+}
+
+/* Character hit animation */
+@keyframes hit-reaction {
+  0% { opacity: 1; }
+  25% { opacity: 0.7; }
+  50% { opacity: 0.4; }
+  75% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.character-hit {
+  animation: hit-reaction 0.5s ease-in-out;
+}
+
+/* Responsive styles for all devices */
+@media (max-width: 768px) {
+  body {
+    font-size: 12px;
+  }
+  
+  #settings {
+    top: 10px;
+    right: 10px;
+  }
+  
+  #info-left,
+  #info-right {
+    top: 10px;
+    font-size: 0.9em;
+  }
+  
+  #info-left {
+    left: 10px;
+  }
+  
+  #info-right {
+    right: 10px;
+  }
+  
+  #wind-info {
+    font-size: 0.9em;
+    padding: 5px 10px;
+  }
+  
+  #windmill {
+    width: 120px;
+    height: 150px;
+  }
+  
+  #fullscreen {
+    bottom: 10px;
+    right: 10px;
+    padding: 5px;
+  }
+  
+  .option-section {
+    min-width: 150px;
+  }
+  
+  #congratulations {
+    padding: 30px 40px;
+    max-width: 250px;
+  }
+}
+
+/* Mobile specific styles */
+/* Mobile-specific classes */
+.mobile-settings {
+  top: 5px !important;
+  right: 5px !important;
+  gap: 5px !important;
+}
+
+.mobile-wind-info {
+  bottom: 40px !important;
+  padding: 3px 8px !important;
+  font-size: 0.85em !important;
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}
+
+.mobile-info {
+  font-size: 0.85em !important;
+}
+
+.mobile-instructions {
+  font-size: 0.9em !important;
+}
+
+/* Touch-friendly adjustments */
+.touch-friendly button,
+.touch-friendly .option-button,
+.touch-friendly .dropdown-content a {
+  padding: 10px !important;
+  min-height: 44px;
+}
+
+.touch-friendly #bomb-grab-area {
+  width: 45px !important;
+  height: 45px !important;
+}
+
+@media (max-width: 450px) {
+  body {
+    font-size: 11px;
+  }
+  
+  #settings {
+    /* Make visible on mobile */
+    opacity: 1 !important;
+    top: 5px;
+    right: 5px;
+    gap: 5px;
+  }
+  
+  #settings button {
+    padding: 5px 8px;
+    font-size: 0.9em;
+  }
+  
+  #youtube, #youtube-card {
+    display: none; /* Hide YouTube link on mobile */
+  }
+  
+  #info-left,
+  #info-right {
+    /* Make always visible on mobile */
+    opacity: 1 !important;
+    top: 5px;
+    font-size: 0.85em;
+  }
+  
+  #info-left {
+    left: 5px;
+  }
+  
+  #info-right {
+    right: 5px;
+  }
+  
+  #info-left h3,
+  #info-right h3 {
+    margin-top: 0;
+    margin-bottom: 5px;
+  }
+  
+  #info-left p,
+  #info-right p {
+    margin: 3px 0;
+  }
+  
+  .health-container {
+    margin-top: 5px;
+  }
+  
+  .health-bar {
+    height: 8px;
+  }
+  
+  #wind-info {
+    bottom: 50px;
+    padding: 3px 8px;
+  }
+  
+  #instructions {
+    /* Make visible but with smaller text */
+    visibility: visible;
+    font-size: 0.9em;
+  }
+  
+  #instructions h1 {
+    font-size: 1.2em;
+  }
+  
+  #instructions h3 {
+    font-size: 1em;
+  }
+  
+  /* Game options panel for mobile */
+  #game-options-panel {
+    padding: 15px;
+    max-height: 90vh;
+    overflow-y: auto;
+    width: 95%;
+  }
+  
+  #game-options-panel h2 {
+    font-size: 20px;
+    margin-bottom: 10px;
+  }
+  
+  .option-section {
+    min-width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .option-section h3 {
+    margin-bottom: 5px;
+    font-size: 1em;
+  }
+  
+  .option-button {
+    min-width: 80px;
+    padding: 5px 10px;
+  }
+  
+  .option-button canvas {
+    width: 50px;
+    height: 50px;
+  }
+  
+  #bomb-grab-area {
+    width: 40px;
+    height: 40px;
+  }
+  
+  /* Player character options sections for mobile */
+  .player-character-options {
+    gap: 5px !important;
+  }
+}
+
+/* Basic CSS for the dropdown */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropbtn:after {
+  content: "▼";
+  margin-left: 7px;
+  font-size: 0.8em;
+  vertical-align: text-top;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f9f9f9;
+  min-width: 120px;
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+}
+
+.dropdown-content a {
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+  white-space: nowrap;
+  font-size: 0.9em;
+}
+
+.dropdown-content a:hover {
+  background-color: #f1f1f1;
+}
+
+/* Show dropdown content when hovering over the button */
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+#windmill {
+  position: absolute;
+  right: 0;
+  fill: rgba(255, 255, 255, 0.5);
+  transform-origin: bottom;
+}
+
+#windmill-head {
+  animation-name: rotate;
+  animation-duration: 4s;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#wind-info {
+  position: absolute;
+  width: 100px;
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+/** Youtube logo by https://codepen.io/alvaromontoro */
+#youtube {
+  z-index: 2;
+  display: block;
+  width: 30px;
+  height: 21px;
+  background: red;
+  position: relative;
+  border-radius: 50% / 11%;
+  transition: transform 0.5s;
+  color: black;
+}
+
+#youtube:hover,
+#youtube:focus {
+  transform: scale(1.2);
+}
+
+#youtube::before {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 7.5%;
+  left: -6%;
+  width: 112%;
+  height: 85%;
+  background: red;
+  border-radius: 9% / 50%;
+}
+
+#youtube::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 6px;
+  left: 11px;
+  width: 15px;
+  height: 10px;
+  border: 5px solid transparent;
+  box-sizing: border-box;
+  border-left: 10px solid white;
+}
+
+#youtube span {
+  font-size: 0;
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+#youtube-card {
+  display: none;
+}
+
+#youtube:hover + #youtube-card {
+  color: black;
+  display: block;
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  padding: 25px 60px 25px 25px;
+  width: 200px;
+  background-color: white;
+}
+
+#fullscreen {
+  all: unset;
+  cursor: pointer;
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+}
+
+/* Game Options Panel */
+#game-options-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(0, 0, 0, 0.85);
+  padding: 15px 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+  display: none; /* Hidden by default */
+  max-width: 600px;
+  max-height: 80vh; /* Limit height */
+  width: 80%;
+  color: white;
+  text-align: center;
+  overflow-y: auto; /* Add scrolling if needed */
+}
+
+#game-options-panel h2 {
+  margin-top: 0;
+  font-size: 22px;
+  margin-bottom: 15px;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.options-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.option-section {
+  flex: 1 0 42%;
+  min-width: 200px;
+  margin-bottom: 10px;
+}
+
+.option-section h3 {
+  margin-bottom: 10px;
+  color: #9cf;
+}
+
+.option-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+}
+
+.option-button {
+  background-color: rgba(80, 80, 80, 0.7);
+  color: white;
+  border: 2px solid #555;
+  border-radius: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 80px;
+  text-align: center;
+  position: relative;
+}
+
+.option-button:hover {
+  background-color: rgba(100, 100, 100, 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.option-button.selected {
+  background-color: #3498db;
+  border-color: #2980b9;
+  box-shadow: 0 0 10px rgba(52, 152, 219, 0.7);
+}
+
+.option-button canvas {
+  display: block;
+  margin: 0 auto 5px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 5px;
+  width: 50px;
+  height: 50px;
+}
+
+.option-button span {
+  display: block;
+  font-size: 11px;
+}
+
+.options-btn {
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 20px;
+  font-size: 14px;
+  margin-top: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.options-btn:hover {
+  background-color: #27ae60;
+  transform: scale(1.05);
+}
+
+/* Hit effect styles */
+.hit-effect {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  background: radial-gradient(circle, rgba(255, 0, 0, 0.8) 0%, rgba(255, 0, 0, 0) 70%);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  z-index: 100;
+  animation: hitPulse 0.5s ease-out forwards;
+}
+
+@keyframes hitPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+}
+
+/* Character hit reaction */
+.character-hit {
+  animation: hitShake 0.3s ease-in-out;
+}
+
+@keyframes hitShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
