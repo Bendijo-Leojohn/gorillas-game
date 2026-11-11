@@ -1144,6 +1144,16 @@ function drawGorilla(player) {
 
 // Function to initialize game options panel with selection buttons
 function initializeGameOptionsPanel() {
+  // Show how many options are available (also handy to spot a stale cache)
+  const charactersHeading = document.getElementById("characters-heading");
+  if (charactersHeading) {
+    charactersHeading.textContent = `Characters (${gameOptions.characters.length})`;
+  }
+  const terrainsHeading = document.getElementById("terrains-heading");
+  if (terrainsHeading) {
+    terrainsHeading.textContent = `Terrains (${gameOptions.terrains.length})`;
+  }
+
   // Create player character selection headers
   const player1Header = document.createElement('div');
   player1Header.className = 'player-header player1-header';
