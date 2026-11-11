@@ -6,12 +6,22 @@
 
 This build adds a few upgrades on top of the tutorial game:
 
-- **Special skills** – pick **Nuke** or **Rocket** in the HUD before you throw:
+- **Two castles, one winner** – each player now stands on their own castle at
+  opposite edges of a 1500-unit battlefield (about 900 units apart). Castles are
+  built from curtain walls, a central keep and battlements, all destructible:
+  every hit carves craters and rubble out of the stone until someone lands a
+  hit on the enemy.
+- **Special skills** – pick **Nuke**, **Missile** or **Shield** in the HUD:
   - **Nuke** (1 per game): 100 damage, an instant knockout, a huge crater in the
-    buildings, a white screen flash and a deep explosion sound.
-  - **Rocket** (2 per game): 45 damage and a bigger blast than a normal banana.
-  - The computer also spends its own specials when it gets desperate, and the
-    HUD dims while it is not your turn.
+    castles, a white screen flash and a deep explosion sound.
+  - **Missile** (2 per game): 45 damage, a bigger blast, and the projectile
+    itself becomes a real missile — pointed nose cone, tail fins, exhaust flame
+    and a smoke trail that follows its flight path.
+  - **Shield** (2 per game): raises a glowing bubble around the player's castle
+    for **10 seconds** (countdown in the HUD and in the health card). A shielded
+    player takes **no damage** from the next hit — the bubble ripples, pops and
+    the shield is gone. The computer raises its own shield when it is hurt or
+    when it sees a charged nuke, and the HUD dims while it is not your turn.
 - **10 characters and 12 terrains** to choose from in *Game Options*:
   Classic Gorilla, Robot, Alien, Ninja, Pirate, Robot Cat, Knight, Wizard,
   Dino, Yeti — across City, Mountains, Futuristic City, Mountain Range,
@@ -44,7 +54,7 @@ This build adds a few upgrades on top of the tutorial game:
 | --- | --- |
 | Aim | Drag the bomb / gorilla hand, or `↑` `↓` `←` `→` |
 | Throw | Release the drag, or press `Space` |
-| Use a special | Click **Nuke** / **Rocket** in the bottom bar, then throw |
+| Use a special | Click **Nuke** / **Missile** / **Shield** in the bottom bar, then throw |
 | Game options | Character, terrain, projectile and effect pickers in the toolbar |
 | Sound | **Sound On / Muted** button |
 | Reset score | ↻ next to the scoreboard |

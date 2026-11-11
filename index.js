@@ -49,6 +49,9 @@ const settings = {
 // ------------------------------------------------------------
 // Special skills
 // ------------------------------------------------------------
+// How long an activated shield protects a player
+const SHIELD_DURATION_MS = 10000;
+
 const SKILLS = {
   nuke: {
     name: "Nuke",
@@ -60,7 +63,7 @@ const SKILLS = {
     color: "#FFD54F",
   },
   rocket: {
-    name: "Rocket",
+    name: "Missile",
     damage: 45,
     explosionSize: 55,
     shake: 16,
@@ -68,9 +71,21 @@ const SKILLS = {
     blastHoles: 4,
     color: "#FF7043",
   },
+  shield: {
+    name: "Shield",
+    color: "#4FC3F7",
+    durationMs: SHIELD_DURATION_MS,
+  },
 };
 
-const STARTING_SKILLS = { nuke: 1, rocket: 2 };
+const STARTING_SKILLS = { nuke: 1, rocket: 2, shield: 2 };
+
+// Castle layout: two castles at the edges of a wide battlefield
+const CASTLE = {
+  width: 280,
+  margin: 60,
+  worldWidth: 1500,
+};
 
 // Initialize character image
 const characterImage = new Image();
@@ -266,6 +281,10 @@ const finalScoreDOM = document.getElementById("final-score");
 // Sound toggle
 const soundToggleDOM = document.getElementById("sound-toggle");
 
+// Shield countdown in the info panels
+const shield1DOM = document.querySelector("#info-left .shield-time");
+const shield2DOM = document.querySelector("#info-right .shield-time");
+
 // Special skills
 const skillsBarDOM = document.getElementById("skills-bar");
 const skillButtonsDOM = document.querySelectorAll(".skill-btn");
@@ -445,19 +464,26 @@ function skillPoolForCurrentPlayer() {
 }
 
 function renderSkills() {
-  const pool = skillPoolForCurrentPlayer() || { nuke: 0, rocket: 0 };
+  const pool = skillPoolForCurrentPlayer() || { nuke: 0, rocket: 0, shield: 0 };
 
   skillButtonsDOM.forEach((button) => {
     const id = button.dataset.skill;
     const count = pool[id] || 0;
     const countDOM = button.querySelector(".skill-count");
+    const shieldActive = id === "shield" && isShieldActive(state.currentPlayer);
 
-    if (countDOM) countDOM.textContent = `×${count}`;
-    button.classList.toggle("active", state.activeSkill === id);
+    let label = `×${count}`;
+    if (shieldActive) label = `${shieldRemainingSeconds(state.currentPlayer)}s`;
+    if (countDOM) countDOM.textContent = label;
+
+    button.classList.toggle("active", id !== "shield" && state.activeSkill === id);
+    button.classList.toggle("active-shield", shieldActive);
     button.classList.toggle("empty", count <= 0);
-    button.disabled = count <= 0;
-    button.setAttribute("aria-pressed", String(state.activeSkill === id));
+    button.disabled = shieldActive || count <= 0;
+    button.setAttribute("aria-pressed", String(state.activeSkill === id || shieldActive));
   });
+
+  updateShieldHUD();
 
   if (skillsBarDOM) {
     const humanTurn =
@@ -473,6 +499,17 @@ function selectSkill(id) {
 
   const pool = skillPoolForCurrentPlayer();
   if (!pool || !(pool[id] > 0)) return;
+
+  // The shield is used immediately, not attached to the next throw
+  if (id === "shield") {
+    if (isShieldActive(state.currentPlayer)) return;
+    pool.shield -= 1;
+    activateShield(state.currentPlayer);
+    SoundEngine.playShield();
+    renderSkills();
+    draw();
+    return;
+  }
 
   state.activeSkill = state.activeSkill === id ? null : id;
   SoundEngine.playClick();
@@ -515,6 +552,82 @@ function chooseComputerSkill() {
   return null;
 }
 
+// ------------------------------------------------------------
+// Timed shields
+// ------------------------------------------------------------
+let shieldTickerId = null;
+
+function isShieldActive(player) {
+  const shield = state.shields && state.shields[player - 1];
+  return Boolean(shield && shield.expiresAt > Date.now());
+}
+
+function shieldRemainingSeconds(player) {
+  const shield = state.shields && state.shields[player - 1];
+  if (!shield) return 0;
+  return Math.max(0, Math.ceil((shield.expiresAt - Date.now()) / 1000));
+}
+
+function activateShield(player) {
+  if (!state.shields) return;
+  state.shields[player - 1].expiresAt = Date.now() + SHIELD_DURATION_MS;
+  startShieldTicker();
+}
+
+function breakShield(player) {
+  if (!state.shields) return;
+  state.shields[player - 1].expiresAt = 0;
+}
+
+function updateShieldHUD() {
+  const text1 = isShieldActive(1) ? `${shieldRemainingSeconds(1)}s` : "—";
+  const text2 = isShieldActive(2) ? `${shieldRemainingSeconds(2)}s` : "—";
+  if (shield1DOM) shield1DOM.textContent = text1;
+  if (shield2DOM) shield2DOM.textContent = text2;
+}
+
+function startShieldTicker() {
+  updateShieldHUD();
+  if (shieldTickerId) return;
+
+  shieldTickerId = setInterval(() => {
+    const anyActive = isShieldActive(1) || isShieldActive(2);
+    renderSkills();
+
+    if (state.phase !== "in flight") draw();
+
+    if (!anyActive) {
+      clearInterval(shieldTickerId);
+      shieldTickerId = null;
+    }
+  }, 120);
+}
+
+function triggerShieldRipple(x, y) {
+  state.shieldRipples = state.shieldRipples || [];
+  state.shieldRipples.push({ x, y, life: 1 });
+}
+
+// The computer raises a shield when it is hurt or facing a charged nuke
+function computerMaybeShield() {
+  const pool = skillPoolForCurrentPlayer();
+  if (!pool || pool.shield <= 0) return;
+  if (isShieldActive(state.currentPlayer)) return;
+
+  const enemyIndex = state.currentPlayer === 1 ? 1 : 0;
+  const myHealth = state.players[state.currentPlayer - 1].health;
+  const enemyNukeReady = state.skills[enemyIndex].nuke > 0;
+  const threatened = enemyNukeReady && state.players[enemyIndex].health <= 60;
+
+  if ((myHealth <= 50 || threatened) && Math.random() < 0.7) {
+    pool.shield -= 1;
+    activateShield(state.currentPlayer);
+    SoundEngine.playShield();
+    renderSkills();
+    draw();
+  }
+}
+
 skillButtonsDOM.forEach((button) => {
   button.addEventListener("click", () => selectSkill(button.dataset.skill));
 });
@@ -548,6 +661,7 @@ function newGame() {
       y: undefined,
       rotation: 0,
       velocity: { x: 0, y: 0 },
+      trail: [], // smoke trail for the missile
       highlight: true,
     },
 
@@ -567,10 +681,16 @@ function newGame() {
       }
     ],
 
-    // Buildings
+    // Buildings (destructible castle blocks) and each player's home keep
     backgroundBuildings: [],
     buildings: [],
+    homes: [],
+    worldWidth: 1500,
     blastHoles: [],
+
+    // Timed shields (epoch ms when they expire, 0 = inactive)
+    shields: [{ expiresAt: 0 }, { expiresAt: 0 }],
+    shieldRipples: [],
 
     stars: [],
     birds: [], // Add birds to state
@@ -606,21 +726,8 @@ function newGame() {
     generateBackgroundBuilding(i);
   }
 
-  // Generate buildings with the currently selected terrain
-  const terrain = gameOptions.terrains.find(
-    (item) => item.id === settings.terrain
-  );
-  if (terrain && typeof terrain.generateBuilding === "function") {
-    for (let i = 0; i < 8; i++) {
-      state.buildings.push(
-        terrain.generateBuilding(i, state.buildings[i - 1])
-      );
-    }
-  } else {
-    for (let i = 0; i < 8; i++) {
-      generateBuilding(i);
-    }
-  }
+  // Each player gets their own castle, far away from the opponent
+  generateCastleWorld();
   builtTerrain = settings.terrain;
 
   calculateScaleAndShift();
@@ -744,9 +851,76 @@ function generateBuilding(index) {
   state.buildings.push({ x, width, height, lightsOn });
 }
 
+// ------------------------------------------------------------
+// Castles: each player owns a destructible castle, far apart
+// ------------------------------------------------------------
+function makeCastleBlock(x, width, height, side, extra = {}) {
+  const lightsOn = [];
+  for (let i = 0; i < 50; i++) {
+    lightsOn.push(Math.random() < 0.45);
+  }
+  return {
+    x,
+    width,
+    height,
+    lightsOn,
+    isCastle: true,
+    castleSide: side,
+    ...extra,
+  };
+}
+
+// A castle is made of curtain walls, a tall keep and crenellations.
+// Every block is in state.buildings, so any of them can be blown apart.
+function buildCastle(baseX, side) {
+  const random = (min, max) => min + Math.random() * (max - min);
+  const wallLeftHeight = random(90, 122);
+  const keepHeight = random(178, 218);
+  const wallRightHeight = random(82, 112);
+
+  const blocks = [];
+  blocks.push(makeCastleBlock(baseX, 74, wallLeftHeight, side));
+  blocks.push(makeCastleBlock(baseX + 84, 112, keepHeight, side));
+  blocks.push(makeCastleBlock(baseX + 206, 74, wallRightHeight, side));
+
+  for (let i = 0; i < 3; i++) {
+    blocks.push(
+      makeCastleBlock(baseX + 5 + i * 24, 16, wallLeftHeight + 16, side, {
+        crenellation: true,
+      })
+    );
+    blocks.push(
+      makeCastleBlock(baseX + 211 + i * 24, 16, wallRightHeight + 16, side, {
+        crenellation: true,
+      })
+    );
+  }
+
+  return { blocks, home: blocks[1] };
+}
+
+function generateCastleWorld() {
+  state.buildings = [];
+  state.homes = [];
+  state.blastHoles = [];
+  state.worldWidth = CASTLE.worldWidth;
+
+  const bases = [
+    CASTLE.margin,
+    CASTLE.worldWidth - CASTLE.margin - CASTLE.width,
+  ];
+
+  bases.forEach((baseX, index) => {
+    const castle = buildCastle(baseX, index + 1);
+    castle.blocks.forEach((block) => state.buildings.push(block));
+    state.homes.push(castle.home);
+  });
+}
+
 function calculateScaleAndShift() {
   const lastBuilding = state.buildings.at(-1);
-  const totalWidthOfTheCity = lastBuilding.x + lastBuilding.width;
+  const totalWidthOfTheCity =
+    state.worldWidth || lastBuilding.x + lastBuilding.width;
 
   const horizontalScale = window.innerWidth / totalWidthOfTheCity ?? 1;
   const verticalScale = window.innerHeight / 500;
@@ -790,10 +964,7 @@ function handleResize() {
 }
 
 function initializeBombPosition() {
-  const building =
-    state.currentPlayer === 1
-      ? state.buildings.at(1) // Second building
-      : state.buildings.at(-2); // Second last building
+  const building = state.homes[state.currentPlayer - 1] || state.homes[0];
 
   const gorillaX = building.x + building.width / 2;
   const gorillaY = building.height;
@@ -806,6 +977,7 @@ function initializeBombPosition() {
   state.bomb.velocity.x = 0;
   state.bomb.velocity.y = 0;
   state.bomb.rotation = 0;
+  state.bomb.trail = [];
 
   // Initialize the position of the grab area in HTML
   const grabAreaRadius = 15;
@@ -817,8 +989,14 @@ function initializeBombPosition() {
 }
 
 function initializeWindmillPosition() {
-  // Move windmill into position
-  const lastBuilding = state.buildings.at(-1);
+  // Put the windmill on top of the rightmost castle wall
+  const walls = state.buildings.filter((block) => !block.crenellation);
+  const lastBuilding = walls.reduce(
+    (rightmost, block) =>
+      !rightmost || block.x > rightmost.x ? block : rightmost,
+    null
+  );
+  if (!lastBuilding) return;
   let rooftopY = lastBuilding.height * state.scale;
   let rooftopX =
     (lastBuilding.x + lastBuilding.width / 2) * state.scale + state.shift;
@@ -862,9 +1040,13 @@ function draw(overlay) {
   // Draw scene
   drawBackgroundBuildings();
   drawBuildingsWithBlastHoles();
+  drawCastleFlags();
   drawGorilla(1);
   drawGorilla(2);
+  drawShields();
+  drawMissileTrail();
   drawBomb();
+  drawShieldRipples();
 
   // Optional overlay (used for impact effects) - already in scene coordinates
   if (typeof overlay === "function") overlay();
@@ -974,11 +1156,68 @@ function drawBird(ctx, x, y, size, wing) {
   ctx.restore();
 }
 
+// Small colour helpers so castles stay readable on every terrain
+function hexToRgb(hex) {
+  const clean = hex.replace("#", "");
+  const value =
+    clean.length === 3
+      ? clean
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : clean;
+  return {
+    r: parseInt(value.slice(0, 2), 16) || 0,
+    g: parseInt(value.slice(2, 4), 16) || 0,
+    b: parseInt(value.slice(4, 6), 16) || 0,
+  };
+}
+
+function colorLuminance(hex) {
+  if (!hex || hex[0] !== "#") return 0.4;
+  const { r, g, b } = hexToRgb(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+function lightenColor(hex, amount) {
+  if (!hex || hex[0] !== "#") return hex;
+  const { r, g, b } = hexToRgb(hex);
+  const mix = (channel) =>
+    Math.round(channel + (255 - channel) * amount)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${mix(r)}${mix(g)}${mix(b)}`;
+}
+
+function getTerrainBuildingColor() {
+  const mode = settings.mode;
+  const terrain = gameOptions.terrains.find(
+    (option) => option.id === settings.terrain
+  );
+  const base = terrain
+    ? terrain.colors[mode].buildings
+    : mode === "dark"
+      ? "#152A47"
+      : "#4A3C68";
+
+  // Very dark castles would vanish into a dark sky, so lift them a little
+  if (mode === "dark" && colorLuminance(base) < 0.12) {
+    return lightenColor(base, 0.2);
+  }
+  return base;
+}
+
 function drawBackgroundBuildings() {
+  const color = getTerrainBuildingColor();
+
+  // The skyline recedes into the haze so the castles read as foreground
+  ctx.save();
+  ctx.globalAlpha = settings.mode === "dark" ? 0.42 : 0.5;
+  ctx.fillStyle = color;
   state.backgroundBuildings.forEach((building) => {
-    ctx.fillStyle = settings.mode === "dark" ? "#254D7E" : "#947285";
     ctx.fillRect(building.x, 0, building.width, building.height);
   });
+  ctx.restore();
 }
 
 function drawBuildingsWithBlastHoles() {
@@ -1003,18 +1242,103 @@ function drawBuildingsWithBlastHoles() {
 
   drawBuildings();
 
+  // Rubble around every crater
+  state.blastHoles.forEach((blastHole, index) => {
+    ctx.save();
+    ctx.fillStyle = settings.mode === "dark"
+      ? "rgba(30, 24, 40, 0.5)"
+      : "rgba(40, 32, 52, 0.45)";
+
+    for (let chunk = 0; chunk < 3; chunk++) {
+      const angle = index * 1.7 + chunk * 2.1;
+      const distance = blastHoleRadius + 6 + ((chunk * 7 + index * 3) % 14);
+      const size = 2 + ((chunk * 5 + index) % 3);
+      ctx.fillRect(
+        blastHole.x + Math.cos(angle) * distance,
+        blastHole.y + Math.sin(angle) * distance,
+        size,
+        size
+      );
+    }
+
+    // Highlight on the surviving lip of the hole
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(
+      blastHole.x,
+      blastHole.y,
+      blastHoleRadius + 1,
+      Math.PI * 0.9,
+      Math.PI * 1.75
+    );
+    ctx.stroke();
+    ctx.restore();
+  });
+
   ctx.restore();
 }
 
 function drawBuildings() {
   // Get the selected terrain's building color
-  const selectedTerrain = gameOptions.terrains.find(terrain => terrain.id === settings.terrain);
-  const mode = settings.mode;
-  const buildingColor = selectedTerrain ? selectedTerrain.colors[mode].buildings : (mode === "dark" ? "#152A47" : "#4A3C68");
+  const buildingColor = getTerrainBuildingColor();
+  const lightStone = colorLuminance(buildingColor) < 0.32;
   state.buildings.forEach((building) => {
     // Draw building
     ctx.fillStyle = buildingColor;
     ctx.fillRect(building.x, 0, building.width, building.height);
+
+    // Castle blocks get stone courses and arrow slits instead of windows
+    if (building.isCastle) {
+      ctx.save();
+
+      // Stone courses
+      ctx.strokeStyle =
+        settings.mode === "dark"
+          ? "rgba(255, 255, 255, 0.07)"
+          : "rgba(0, 0, 0, 0.10)";
+      ctx.lineWidth = 1;
+      for (let y = 14; y < building.height; y += 16) {
+        ctx.beginPath();
+        ctx.moveTo(building.x, y);
+        ctx.lineTo(building.x + building.width, y);
+        ctx.stroke();
+      }
+
+      if (!building.crenellation) {
+        // Arrow slits
+        const slitWidth = 6;
+        const slitHeight = 16;
+        const columns = Math.max(1, Math.floor(building.width / 36));
+        const rows = Math.max(1, Math.floor(building.height / 64));
+
+        ctx.fillStyle = lightStone
+          ? "rgba(190, 212, 235, 0.35)"
+          : "rgba(18, 14, 26, 0.55)";
+
+        for (let column = 0; column < columns; column++) {
+          for (let row = 0; row < rows; row++) {
+            const slitX =
+              building.x +
+              (building.width / (columns + 1)) * (column + 1) -
+              slitWidth / 2;
+            const slitY = 24 + row * 60;
+            if (slitY + slitHeight < building.height - 8) {
+              ctx.fillRect(slitX, slitY, slitWidth, slitHeight);
+            }
+          }
+        }
+
+        // Rim light + shadow cap keep the wall silhouette readable
+        ctx.fillStyle = "rgba(255, 255, 255, 0.16)";
+        ctx.fillRect(building.x, building.height - 5, building.width, 2);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+        ctx.fillRect(building.x, building.height - 3, building.width, 3);
+      }
+
+      ctx.restore();
+      return;
+    }
 
     // Draw windows
     const windowWidth = 10;
@@ -1049,13 +1373,187 @@ function drawBuildings() {
   });
 }
 
+// Player flags on top of each castle
+function drawCastleFlags() {
+  if (!state.homes) return;
+
+  state.homes.forEach((home, index) => {
+    if (!home) return;
+
+    const offset = index === 0 ? 34 : -34;
+    const poleX = home.x + home.width / 2 + offset;
+    const baseY = home.height;
+    const poleHeight = 46;
+
+    ctx.save();
+
+    // Pole
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(poleX, baseY);
+    ctx.lineTo(poleX, baseY + poleHeight);
+    ctx.stroke();
+
+    // Flag
+    const color = index === 0 ? "#42A5F5" : "#EF5350";
+    const direction = index === 0 ? 1 : -1;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(poleX, baseY + poleHeight);
+    ctx.lineTo(poleX + 26 * direction, baseY + poleHeight - 9);
+    ctx.lineTo(poleX, baseY + poleHeight - 18);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  });
+}
+
+// Pulsing shield bubbles around protected players
+function drawShields() {
+  if (!state.shields) return;
+
+  [1, 2].forEach((player) => {
+    if (!isShieldActive(player)) return;
+
+    const home = state.homes[player - 1];
+    if (!home) return;
+
+    const centreX = home.x + home.width / 2;
+    const centreY = home.height + 46;
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 220);
+
+    ctx.save();
+    ctx.globalAlpha = 0.18 + pulse * 0.12;
+    ctx.fillStyle = "#4FC3F7";
+    ctx.beginPath();
+    ctx.ellipse(centreX, centreY, 46 + pulse * 3, 62 + pulse * 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = "#81D4FA";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.ellipse(centreX, centreY, 46 + pulse * 3, 62 + pulse * 4, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// Ripple left behind when a shield soaks up a missile
+function drawShieldRipples() {
+  if (!state.shieldRipples || !state.shieldRipples.length) return;
+
+  state.shieldRipples = state.shieldRipples
+    .map((ripple) => ({ ...ripple, life: ripple.life - 0.06 }))
+    .filter((ripple) => ripple.life > 0);
+
+  state.shieldRipples.forEach((ripple) => {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, ripple.life) * 0.8;
+    ctx.strokeStyle = "#4FC3F7";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(ripple.x, ripple.y, (1 - ripple.life) * 55 + 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// Missile body, nose pointing along +x before rotation
+function drawMissile(angle) {
+  ctx.save();
+  ctx.rotate(angle);
+
+  const flicker = 0.7 + Math.random() * 0.5;
+
+  // Exhaust flame
+  ctx.fillStyle = "rgba(255, 152, 0, 0.95)";
+  ctx.beginPath();
+  ctx.moveTo(-15, -4);
+  ctx.lineTo(-15 - 17 * flicker, 0);
+  ctx.lineTo(-15, 4);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255, 235, 59, 0.95)";
+  ctx.beginPath();
+  ctx.moveTo(-15, -2);
+  ctx.lineTo(-15 - 9 * flicker, 0);
+  ctx.lineTo(-15, 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Body
+  ctx.fillStyle = "#B0BEC5";
+  ctx.beginPath();
+  ctx.moveTo(17, 0);
+  ctx.lineTo(7, -6);
+  ctx.lineTo(-15, -6);
+  ctx.lineTo(-15, 6);
+  ctx.lineTo(7, 6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Nose cone
+  ctx.fillStyle = "#E53935";
+  ctx.beginPath();
+  ctx.moveTo(17, 0);
+  ctx.lineTo(7, -6);
+  ctx.lineTo(7, 6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Fins
+  ctx.fillStyle = "#78909C";
+  ctx.beginPath();
+  ctx.moveTo(-15, -6);
+  ctx.lineTo(-21, -12);
+  ctx.lineTo(-10, -6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-15, 6);
+  ctx.lineTo(-21, 12);
+  ctx.lineTo(-10, 6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Porthole
+  ctx.fillStyle = "#4FC3F7";
+  ctx.beginPath();
+  ctx.arc(2, 0, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// Smoke trail behind a flying missile
+function drawMissileTrail() {
+  if (state.phase !== "in flight" || state.throwSkill !== "rocket") return;
+
+  const trail = state.bomb.trail || [];
+  trail.forEach((point, index) => {
+    const t = index / Math.max(1, trail.length);
+    ctx.save();
+    ctx.globalAlpha = 0.04 + t * 0.32;
+    ctx.fillStyle = "#CFD8DC";
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 2 + t * 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
 function drawGorilla(player) {
   ctx.save();
 
-  const building =
-    player === 1
-      ? state.buildings.at(1) // Second building
-      : state.buildings.at(-2); // Second last building
+  const building = state.homes[player - 1];
+  if (!building) {
+    ctx.restore();
+    return;
+  }
 
   ctx.translate(building.x + building.width / 2, building.height);
   
@@ -1499,16 +1997,8 @@ function updateBuildingsForTerrain() {
   const terrain = gameOptions.terrains.find(t => t.id === settings.terrain);
   if (!terrain) return;
 
-  // Reset buildings and the holes blown into the previous world
-  state.buildings = [];
-  state.blastHoles = [];
-
-  // Generate buildings with the selected terrain's building generator
-  for (let i = 0; i < 8; i++) {
-    const previousBuilding = state.buildings[i - 1];
-    const building = terrain.generateBuilding(i, previousBuilding);
-    state.buildings.push(building);
-  }
+  // Rebuild both castles (this also clears the holes blown into the old one)
+  generateCastleWorld();
 
   // Update scale and shift
   calculateScaleAndShift();
@@ -1647,8 +2137,18 @@ function drawBomb() {
 
     // Get selected ball
     const selectedBall = gameOptions.balls.find(ball => ball.id === settings.ball);
-    
-    if (selectedBall) {
+
+    if (state.activeSkill === "rocket") {
+      // A missile follows the aim instead of a ball
+      const speed = Math.hypot(state.bomb.velocity.x, state.bomb.velocity.y);
+      const aimAngle =
+        speed > 1
+          ? Math.atan2(state.bomb.velocity.y, state.bomb.velocity.x)
+          : state.currentPlayer === 1
+            ? 0
+            : Math.PI;
+      drawMissile(aimAngle);
+    } else if (selectedBall) {
       // Draw the selected ball for aiming
       selectedBall.draw(ctx, 0); // 0 rotation for aiming
     } else {
@@ -1671,8 +2171,11 @@ function drawBomb() {
   } else if (state.phase === "in flight") {
     // Get selected ball
     const selectedBall = gameOptions.balls.find(ball => ball.id === settings.ball);
-    
-    if (selectedBall) {
+
+    if (state.throwSkill === "rocket") {
+      // Missile points where it is actually flying
+      drawMissile(Math.atan2(state.bomb.velocity.y, state.bomb.velocity.x));
+    } else if (selectedBall) {
       // Draw the selected ball in flight
       selectedBall.draw(ctx, state.bomb.rotation);
     } else {
@@ -1915,6 +2418,9 @@ window.addEventListener("keydown", function (event) {
 });
 
 function computerThrow() {
+  // The computer may protect itself before spending an offensive skill
+  computerMaybeShield();
+
   // The computer may spend one of its special skills
   state.pendingSkill = chooseComputerSkill();
 
@@ -1942,11 +2448,8 @@ function runSimulations(numberOfSimulations) {
   };
   simulationMode = true;
 
-  // Calculating the center position of the enemy
-  const enemyBuilding =
-    state.currentPlayer === 1
-      ? state.buildings.at(-2) // Second last building
-      : state.buildings.at(1); // Second building
+  // Calculating the center position of the enemy's keep
+  const enemyBuilding = state.homes[state.currentPlayer === 1 ? 1 : 0];
   const enemyX = enemyBuilding.x + enemyBuilding.width / 2;
   const enemyY = enemyBuilding.height + 30;
 
@@ -2016,7 +2519,13 @@ function throwBomb() {
     previousAnimationTimestamp = undefined;
     animationFrameRequestID = requestAnimationFrame(animate);
   }
-  SoundEngine.playThrow();
+  if (!simulationMode) {
+    if (state.throwSkill === "rocket") {
+      SoundEngine.playMissile();
+    } else {
+      SoundEngine.playThrow();
+    }
+  }
 }
 
 function animate(timestamp) {
@@ -2137,6 +2646,12 @@ function moveBomb(elapsedTime) {
   // Rotate according to the direction
   const direction = state.currentPlayer === 1 ? -1 : +1;
   state.bomb.rotation += direction * 5 * multiplier;
+
+  // Keep a short smoke trail behind a flying missile
+  if (!simulationMode && state.throwSkill === "rocket") {
+    state.bomb.trail.push({ x: state.bomb.x, y: state.bomb.y });
+    if (state.bomb.trail.length > 60) state.bomb.trail.shift();
+  }
 }
 
 function checkFrameHit() {
@@ -2196,11 +2711,9 @@ function checkGorillaHit() {
   // Determine which player is the enemy (the one being targeted by the current player)
   const enemyPlayer = state.currentPlayer === 1 ? 2 : 1;
   
-  // Get the building where the enemy is standing
-  const enemyBuilding = enemyPlayer === 1
-    ? state.buildings.at(1) // Player 1's building (index 1)
-    : state.buildings.at(-2); // Player 2's building (second to last)
-  
+  // The enemy stands on top of their own keep
+  const enemyBuilding = state.homes[enemyPlayer - 1];
+
   if (!enemyBuilding) return false;
 
   // Define the hitbox around the character image
@@ -2231,6 +2744,23 @@ function checkGorillaHit() {
     }
     
     if (!state.players[playerIndex].wasHitThisThrow) {
+      // A raised shield soaks up the whole hit and breaks
+      if (isShieldActive(enemyPlayer)) {
+        state.players[playerIndex].wasHitThisThrow = true;
+        breakShield(enemyPlayer);
+        state.lastHitPoint = {
+          x: state.bomb.x,
+          y: state.bomb.y,
+          isCharacter: true,
+          playerIndex,
+        };
+        triggerShieldRipple(state.bomb.x, state.bomb.y);
+        state.shake = 6;
+        SoundEngine.playShieldBlock();
+        renderSkills();
+        return true; // impact, but no damage
+      }
+
       // Reduce health when hit (special skills hurt a lot more)
       const skill = SKILLS[state.throwSkill];
       const damage = skill ? skill.damage : 25;

@@ -927,3 +927,36 @@ canvas,
   letter-spacing: 0.06em;
   vertical-align: middle;
 }
+
+/* Shield skill state */
+.skill-btn.active-shield {
+  background-color: rgba(79, 195, 247, 0.25);
+  border-color: #81D4FA;
+  box-shadow: 0 0 14px rgba(79, 195, 247, 0.5);
+}
+
+.skill-btn.active-shield .skill-count {
+  color: #B3E5FC;
+}
+
+/* Shield timer in the HUD cards */
+.shield-time {
+  color: #81D4FA;
+  font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  #skills-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 92vw;
+  }
+
+  .skill-btn .skill-name {
+    display: none;
+  }
+
+  .skill-btn .skill-icon {
+    font-size: 15px;
+  }
+}

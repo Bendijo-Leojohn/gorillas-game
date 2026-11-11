@@ -1412,7 +1412,7 @@ const gameOptions = {
     },
     {
       id: 'rocket',
-      name: 'Rocket',
+      name: 'Comet',
       draw: function(ctx, rotation) {
         ctx.save();
         ctx.rotate(rotation);

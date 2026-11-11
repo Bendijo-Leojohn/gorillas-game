@@ -18,10 +18,10 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A6%8D%3C/text%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="index.css?v=3" />
-    <script src="game-options.js?v=3"></script>
-    <script src="sound-engine.js?v=3"></script>
-    <script src="index.js?v=3" defer></script>
+    <link rel="stylesheet" href="index.css?v=4" />
+    <script src="game-options.js?v=4"></script>
+    <script src="sound-engine.js?v=4"></script>
+    <script src="index.js?v=4" defer></script>
   </head>
   <body>
     <canvas id="game"></canvas>
@@ -67,6 +67,7 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
         <div class="health-bar player1-health"></div>
         <p>Health: <span class="health">100</span>%</p>
       </div>
+      <p>Shield: <span class="shield-time">—</span></p>
     </div>
 
     <div id="info-right">
@@ -77,6 +78,7 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
         <div class="health-bar player2-health"></div>
         <p>Health: <span class="health">100</span>%</p>
       </div>
+      <p>Shield: <span class="shield-time">—</span></p>
     </div>
 
     <div id="instructions">
@@ -88,7 +90,7 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
         <strong>Space</strong> to throw
       </p>
       <p class="control-hint special-hint">
-        Pick a special below: <strong>Nuke</strong> or <strong>Rocket</strong>
+        Pick a special below: <strong>Nuke</strong>, <strong>Missile</strong> or <strong>Shield</strong>
       </p>
     </div>
 
@@ -101,9 +103,15 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
         <span class="skill-count">&times;1</span>
       </button>
       <button class="skill-btn" type="button" data-skill="rocket"
-        title="Rocket: 45 damage and a bigger explosion (2 per game)">
+        title="Missile: 45 damage, flies like a real missile with a smoke trail (2 per game)">
         <span class="skill-icon">&#128640;</span>
-        <span class="skill-name">Rocket</span>
+        <span class="skill-name">Missile</span>
+        <span class="skill-count">&times;2</span>
+      </button>
+      <button class="skill-btn" type="button" data-skill="shield"
+        title="Shield: blocks one hit, disappears after 10 seconds (2 per game)">
+        <span class="skill-icon">&#128737;</span>
+        <span class="skill-name">Shield</span>
         <span class="skill-count">&times;2</span>
       </button>
     </div>
@@ -133,7 +141,7 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
     
     <!-- Game Options Selection Panel -->
     <div id="game-options-panel">
-      <h2>Game Options <span class="version-tag">v2.1</span></h2>
+      <h2>Game Options <span class="version-tag">v2.2</span></h2>
       <div class="options-container">
         <div class="option-section">
           <h3 id="characters-heading">Characters</h3>

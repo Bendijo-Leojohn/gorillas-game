@@ -269,6 +269,59 @@ const SoundEngine = (() => {
     });
   });
 
+  const playMissile = guard(() => {
+    // Ignition whoosh that rises as the missile leaves the castle
+    noiseBurst({
+      duration: 0.55,
+      volume: 0.2,
+      startFrequency: 320,
+      endFrequency: 2800,
+      filterType: "bandpass",
+    });
+    tone({
+      frequency: 160,
+      endFrequency: 520,
+      duration: 0.4,
+      volume: 0.12,
+      type: "sawtooth",
+    });
+  });
+
+  const playShield = guard(() => {
+    tone({
+      frequency: 320,
+      endFrequency: 660,
+      duration: 0.28,
+      volume: 0.15,
+      type: "sine",
+    });
+    tone({
+      frequency: 480,
+      endFrequency: 940,
+      duration: 0.34,
+      volume: 0.09,
+      type: "triangle",
+      delay: 0.06,
+    });
+  });
+
+  const playShieldBlock = guard(() => {
+    tone({
+      frequency: 900,
+      endFrequency: 280,
+      duration: 0.24,
+      volume: 0.2,
+      type: "square",
+    });
+    noiseBurst({
+      duration: 0.22,
+      volume: 0.16,
+      startFrequency: 2400,
+      endFrequency: 400,
+      filterType: "bandpass",
+    });
+  });
+
   const playClick = guard(() => {
     tone({
       frequency: 740,
@@ -387,6 +440,9 @@ const SoundEngine = (() => {
     playHit,
     playWin,
     playClick,
+    playMissile,
+    playShield,
+    playShieldBlock,
     onChange(listener) {
       listeners.add(listener);
       try {
