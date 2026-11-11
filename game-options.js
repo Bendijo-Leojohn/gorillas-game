@@ -1313,6 +1313,161 @@ const gameOptions = {
           windows: '#FFAB40'
         }
       }
+    },
+    {
+      id: 'space',
+      name: 'Space Station',
+      generateBuilding: function(index, previousBuilding) {
+        const x = previousBuilding
+          ? previousBuilding.x + previousBuilding.width + 6
+          : 0;
+        const width = 60 + Math.random() * 90;
+        const height =
+          index <= 1 || index >= 6
+            ? 40 + Math.random() * 90
+            : 110 + Math.random() * 200;
+        const lightsOn = [];
+        for (let i = 0; i < 50; i++) {
+          lightsOn.push(Math.random() < 0.55);
+        }
+        return { x, width, height, lightsOn };
+      },
+      colors: {
+        light: {
+          sky: ['#6E5BC9', '#B7AEFF'],
+          buildings: '#2E2A55',
+          windows: '#9DE1FF'
+        },
+        dark: {
+          sky: ['#050318', '#241B4A'],
+          buildings: '#151233',
+          windows: '#7C6BFF'
+        }
+      }
+    },
+    {
+      id: 'reef',
+      name: 'Underwater Reef',
+      generateBuilding: function(index, previousBuilding) {
+        const x = previousBuilding
+          ? previousBuilding.x + previousBuilding.width + 5
+          : 0;
+        const width = 70 + Math.random() * 110;
+        const height =
+          index <= 1 || index >= 6
+            ? 30 + Math.random() * 100
+            : 90 + Math.random() * 170;
+        const lightsOn = [];
+        for (let i = 0; i < 50; i++) {
+          lightsOn.push(Math.random() < 0.45);
+        }
+        return { x, width, height, lightsOn };
+      },
+      colors: {
+        light: {
+          sky: ['#1FA7B8', '#8FE3EF'],
+          buildings: '#0E5C68',
+          windows: '#B2EBF2'
+        },
+        dark: {
+          sky: ['#01252E', '#075A6E'],
+          buildings: '#05303A',
+          windows: '#4DD0E1'
+        }
+      }
+    },
+    {
+      id: 'blossom',
+      name: 'Cherry Blossom',
+      generateBuilding: function(index, previousBuilding) {
+        const x = previousBuilding
+          ? previousBuilding.x + previousBuilding.width + 4
+          : 0;
+        const width = 80 + Math.random() * 120;
+        const height =
+          index <= 1 || index >= 6
+            ? 40 + Math.random() * 110
+            : 100 + Math.random() * 180;
+        const lightsOn = [];
+        for (let i = 0; i < 50; i++) {
+          lightsOn.push(Math.random() < 0.4);
+        }
+        return { x, width, height, lightsOn };
+      },
+      colors: {
+        light: {
+          sky: ['#FFD1DC', '#FFF0F4'],
+          buildings: '#7A4B57',
+          windows: '#FFE4EC'
+        },
+        dark: {
+          sky: ['#2A1220', '#6B2B45'],
+          buildings: '#3A1A28',
+          windows: '#FFB3C8'
+        }
+      }
+    },
+    {
+      id: 'graveyard',
+      name: 'Graveyard',
+      generateBuilding: function(index, previousBuilding) {
+        const x = previousBuilding
+          ? previousBuilding.x + previousBuilding.width + 6
+          : 0;
+        const width = 55 + Math.random() * 90;
+        const height =
+          index <= 1 || index >= 6
+            ? 35 + Math.random() * 90
+            : 95 + Math.random() * 160;
+        const lightsOn = [];
+        for (let i = 0; i < 50; i++) {
+          lightsOn.push(Math.random() < 0.25);
+        }
+        return { x, width, height, lightsOn };
+      },
+      colors: {
+        light: {
+          sky: ['#6E7F73', '#BFC9B4'],
+          buildings: '#3B4238',
+          windows: '#C9D6B8'
+        },
+        dark: {
+          sky: ['#0B1410', '#22332A'],
+          buildings: '#101A15',
+          windows: '#7BC48C'
+        }
+      }
+    },
+    {
+      id: 'skyislands',
+      name: 'Sky Islands',
+      generateBuilding: function(index, previousBuilding) {
+        const x = previousBuilding
+          ? previousBuilding.x + previousBuilding.width + 8
+          : 0;
+        const width = 65 + Math.random() * 100;
+        const height =
+          index <= 1 || index >= 6
+            ? 50 + Math.random() * 120
+            : 120 + Math.random() * 190;
+        const lightsOn = [];
+        for (let i = 0; i < 50; i++) {
+          lightsOn.push(Math.random() < 0.5);
+        }
+        return { x, width, height, lightsOn };
+      },
+      colors: {
+        light: {
+          sky: ['#7FD4FF', '#E3F7FF'],
+          buildings: '#7A8FA6',
+          windows: '#FFFFFF'
+        },
+        dark: {
+          sky: ['#1B2A4A', '#4C7FBF'],
+          buildings: '#243B57',
+          windows: '#BFE4FF'
+        }
+      }
     }
   ],
   
@@ -1577,6 +1732,177 @@ const gameOptions = {
         ctx.fillRect(-12, -12, 24, 6);
         ctx.restore();
       }
+    },
+    {
+      id: 'shuriken',
+      name: 'Shuriken',
+      draw: function(ctx, rotation) {
+        ctx.save();
+        ctx.rotate(rotation);
+        ctx.fillStyle = '#B0BEC5';
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+          ctx.rotate(Math.PI / 2);
+          ctx.lineTo(0, -12);
+          ctx.lineTo(4, -4);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#37474F';
+        ctx.beginPath();
+        ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, 12, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    },
+    {
+      id: 'boomerang',
+      name: 'Boomerang',
+      draw: function(ctx, rotation) {
+        ctx.save();
+        ctx.rotate(rotation);
+        ctx.fillStyle = '#B8742F';
+        ctx.beginPath();
+        ctx.moveTo(-13, 7);
+        ctx.quadraticCurveTo(0, -15, 13, 7);
+        ctx.lineTo(7, 10);
+        ctx.quadraticCurveTo(0, -3, -7, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 224, 178, 0.45)';
+        ctx.beginPath();
+        ctx.moveTo(-13, 7);
+        ctx.quadraticCurveTo(0, -15, 13, 7);
+        ctx.lineTo(10, 6);
+        ctx.quadraticCurveTo(0, -9, -10, 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(60, 30, 10, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-8, 4);
+        ctx.quadraticCurveTo(0, -8, 8, 4);
+        ctx.stroke();
+        ctx.restore();
+      }
+    },
+    {
+      id: 'coconut',
+      name: 'Coconut',
+      draw: function(ctx, rotation) {
+        ctx.save();
+        ctx.rotate(rotation);
+        ctx.fillStyle = '#5D4037';
+        ctx.beginPath();
+        ctx.arc(0, 0, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#3E2723';
+        [-4, 0, 4].forEach(function(offsetX) {
+          ctx.beginPath();
+          ctx.arc(offsetX, -3, 1.6, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 7, Math.PI * 0.1, Math.PI * 0.7);
+        ctx.stroke();
+        ctx.restore();
+      }
+    },
+    {
+      id: 'waterballoon',
+      name: 'Water Balloon',
+      draw: function(ctx, rotation) {
+        ctx.save();
+        ctx.rotate(rotation);
+        ctx.fillStyle = 'rgba(41, 182, 246, 0.85)';
+        ctx.beginPath();
+        ctx.ellipse(0, 1, 8, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(-2, -1, 3, 4, 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#0277BD';
+        ctx.beginPath();
+        ctx.moveTo(-3, 8);
+        ctx.lineTo(3, 8);
+        ctx.lineTo(0, 12);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    },
+    {
+      id: 'meteor',
+      name: 'Meteor',
+      draw: function(ctx, rotation) {
+        ctx.save();
+        ctx.rotate(rotation);
+        // Fiery tail behind the rock
+        const tail = ctx.createLinearGradient(-20, 0, 4, 0);
+        tail.addColorStop(0, 'rgba(255, 87, 34, 0)');
+        tail.addColorStop(1, 'rgba(255, 193, 7, 0.9)');
+        ctx.fillStyle = tail;
+        ctx.beginPath();
+        ctx.moveTo(4, -5);
+        ctx.lineTo(-22, 0);
+        ctx.lineTo(4, 5);
+        ctx.closePath();
+        ctx.fill();
+        // Rock
+        ctx.fillStyle = '#4E342E';
+        ctx.beginPath();
+        ctx.moveTo(8, 0);
+        ctx.lineTo(5, -7);
+        ctx.lineTo(-2, -8);
+        ctx.lineTo(-6, -2);
+        ctx.lineTo(-4, 6);
+        ctx.lineTo(4, 7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 152, 0, 0.85)';
+        ctx.beginPath();
+        ctx.arc(2, -1, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    },
+    {
+      id: 'bowlingball',
+      name: 'Bowling Ball',
+      draw: function(ctx, rotation) {
+        ctx.save();
+        ctx.rotate(rotation);
+        ctx.fillStyle = '#2E2E52';
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(179, 157, 255, 0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#12122A';
+        [[-3, -2], [2, -4], [1, 2]].forEach(function(hole) {
+          ctx.beginPath();
+          ctx.arc(hole[0], hole[1], 1.8, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 7.5, Math.PI * 0.85, Math.PI * 1.55);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
   ],
   
@@ -1712,9 +2038,161 @@ const gameOptions = {
         ctx.arc(x, y, radius * 0.7, 0, Math.PI * 2);
         ctx.fill();
       }
+    },
+    {
+      id: 'lightning',
+      name: 'Lightning',
+      draw: function(ctx, x, y, size, progress) {
+        const bolts = 4;
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 249, 196, ${1 - progress})`;
+        ctx.lineWidth = 3 * (1 - progress * 0.6);
+        ctx.shadowColor = '#FFF59D';
+        ctx.shadowBlur = 12;
+
+        for (let bolt = 0; bolt < bolts; bolt++) {
+          const angle = (Math.PI * 2 * bolt) / bolts + progress * 0.4;
+          let px = x;
+          let py = y;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          for (let step = 1; step <= 4; step++) {
+            const distance = (size * progress * step) / 4;
+            const jitter = ((step * 37 + bolt * 53) % 17) - 8;
+            px = x + Math.cos(angle) * distance + jitter;
+            py = y + Math.sin(angle) * distance + jitter * 0.6;
+            ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    },
+    {
+      id: 'smoke',
+      name: 'Smoke Puff',
+      draw: function(ctx, x, y, size, progress) {
+        const puffs = 7;
+        ctx.save();
+        for (let i = 0; i < puffs; i++) {
+          const angle = (Math.PI * 2 * i) / puffs + progress;
+          const distance = size * progress * (0.4 + ((i * 13) % 7) / 10);
+          const puffSize = size * 0.35 * (1 - progress * 0.35) * (0.7 + ((i * 5) % 5) / 8);
+          ctx.fillStyle = `rgba(120, 128, 136, ${0.5 * (1 - progress)})`;
+          ctx.beginPath();
+          ctx.arc(
+            x + Math.cos(angle) * distance,
+            y + Math.sin(angle) * distance - progress * 12,
+            puffSize,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    },
+    {
+      id: 'confetti',
+      name: 'Confetti',
+      draw: function(ctx, x, y, size, progress) {
+        const colors = ['#FF5252', '#FFD740', '#69F0AE', '#40C4FF', '#E040FB'];
+        const pieces = 26;
+        ctx.save();
+        for (let i = 0; i < pieces; i++) {
+          const angle = (Math.PI * 2 * i) / pieces;
+          const distance = size * progress * (0.5 + ((i * 7) % 9) / 10);
+          const drop = progress * progress * size * 0.8;
+          ctx.save();
+          ctx.translate(
+            x + Math.cos(angle) * distance,
+            y + Math.sin(angle) * distance + drop
+          );
+          ctx.rotate(angle + progress * 6);
+          ctx.fillStyle = colors[i % colors.length];
+          ctx.globalAlpha = 1 - progress;
+          ctx.fillRect(-3, -1.5, 6, 3);
+          ctx.restore();
+        }
+        ctx.restore();
+      }
+    },
+    {
+      id: 'shards',
+      name: 'Shatter Shards',
+      draw: function(ctx, x, y, size, progress) {
+        const shards = 16;
+        ctx.save();
+        ctx.globalAlpha = 1 - progress;
+        for (let i = 0; i < shards; i++) {
+          const angle = (Math.PI * 2 * i) / shards + (i % 3) * 0.2;
+          const distance = size * progress * (0.4 + ((i * 11) % 8) / 10);
+          const shardSize = size * 0.22 * (1 - progress * 0.4);
+          const cx = x + Math.cos(angle) * distance;
+          const cy = y + Math.sin(angle) * distance;
+          ctx.fillStyle = i % 2 ? 'rgba(224, 247, 250, 0.9)' : 'rgba(129, 212, 250, 0.85)';
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - shardSize);
+          ctx.lineTo(cx + shardSize * 0.7, cy + shardSize * 0.6);
+          ctx.lineTo(cx - shardSize * 0.7, cy + shardSize * 0.5);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    },
+    {
+      id: 'rings',
+      name: 'Ring Pulse',
+      draw: function(ctx, x, y, size, progress) {
+        ctx.save();
+        for (let ring = 0; ring < 3; ring++) {
+          const ringProgress = Math.max(0, progress - ring * 0.16);
+          if (ringProgress <= 0) continue;
+          const radius = size * ringProgress;
+          ctx.strokeStyle = `rgba(129, 212, 250, ${(1 - ringProgress) * (0.9 - ring * 0.2)})`;
+          ctx.lineWidth = 4 * (1 - ringProgress * 0.6);
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.6 * (1 - progress)})`;
+        ctx.beginPath();
+        ctx.arc(x, y, size * 0.18 * (1 - progress), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     }
   ]
 };
+
+
+// What each terrain throws at the players: rocks hang from the ceiling,
+// platforms float in the gap between the castles and hazard is the ground band
+const terrainObstaclePresets = {
+  city: { rocks: 0, platforms: 2, hazard: null },
+  mountains: { rocks: 3, platforms: 1, hazard: null },
+  futuristic: { rocks: 0, platforms: 3, hazard: null },
+  mountain: { rocks: 3, platforms: 0, hazard: null },
+  sea: { rocks: 0, platforms: 1, hazard: 'water' },
+  bedrock: { rocks: 4, platforms: 0, hazard: null },
+  desert: { rocks: 0, platforms: 2, hazard: 'sand' },
+  candyland: { rocks: 0, platforms: 2, hazard: null },
+  neon: { rocks: 0, platforms: 2, hazard: null },
+  jungle: { rocks: 1, platforms: 2, hazard: 'water' },
+  arctic: { rocks: 2, platforms: 1, hazard: 'ice' },
+  volcano: { rocks: 2, platforms: 1, hazard: 'lava' },
+  space: { rocks: 0, platforms: 3, hazard: null },
+  reef: { rocks: 0, platforms: 1, hazard: 'water' },
+  blossom: { rocks: 1, platforms: 2, hazard: 'water' },
+  graveyard: { rocks: 2, platforms: 1, hazard: null },
+  skyislands: { rocks: 1, platforms: 3, hazard: 'cloud' }
+};
+
+gameOptions.terrains.forEach((terrain) => {
+  terrain.obstacles =
+    terrainObstaclePresets[terrain.id] || { rocks: 1, platforms: 1, hazard: null };
+});
 
 // Helper function for rounded rectangles
 function roundedRect(ctx, x, y, width, height, radius) {
