@@ -187,20 +187,50 @@ const SoundEngine = (() => {
     });
   });
 
-  const playExplosion = guard(() => {
+  // intensity: 1 = normal hit, 2 = rocket, 3 = nuke
+  const playExplosion = guard((intensity = 1) => {
+    const level = Math.max(1, Math.min(3, intensity));
+
     noiseBurst({
-      duration: 0.55,
-      volume: 0.45,
-      startFrequency: 1400,
-      endFrequency: 60,
+      duration: 0.45 + level * 0.12,
+      volume: 0.3 + level * 0.06,
+      startFrequency: 1600 - level * 200,
+      endFrequency: 50,
     });
     tone({
-      frequency: 120,
-      endFrequency: 32,
-      duration: 0.4,
-      volume: 0.25,
+      frequency: 130 - level * 18,
+      endFrequency: 30,
+      duration: 0.35 + level * 0.1,
+      volume: 0.18 + level * 0.04,
       type: "sine",
     });
+
+    if (level >= 3) {
+      // Nuke: extra rumbling tail
+      noiseBurst({
+        duration: 1.2,
+        volume: 0.3,
+        startFrequency: 420,
+        endFrequency: 35,
+        delay: 0.08,
+      });
+      tone({
+        frequency: 70,
+        endFrequency: 22,
+        duration: 1.1,
+        volume: 0.22,
+        type: "triangle",
+        delay: 0.06,
+      });
+    } else if (level === 2) {
+      noiseBurst({
+        duration: 0.5,
+        volume: 0.16,
+        startFrequency: 900,
+        endFrequency: 80,
+        delay: 0.06,
+      });
+    }
   });
 
   const playHit = guard(() => {

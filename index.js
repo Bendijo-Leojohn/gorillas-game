@@ -46,6 +46,32 @@ const settings = {
   player2Character: 'robot',    // Player 2's character
 };
 
+// ------------------------------------------------------------
+// Special skills
+// ------------------------------------------------------------
+const SKILLS = {
+  nuke: {
+    name: "Nuke",
+    damage: 100,        // instant knockout
+    explosionSize: 135,
+    shake: 26,
+    blastRadius: 65,
+    blastHoles: 12,
+    color: "#FFD54F",
+  },
+  rocket: {
+    name: "Rocket",
+    damage: 45,
+    explosionSize: 55,
+    shake: 16,
+    blastRadius: 28,
+    blastHoles: 4,
+    color: "#FF7043",
+  },
+};
+
+const STARTING_SKILLS = { nuke: 1, rocket: 2 };
+
 // Initialize character image
 const characterImage = new Image();
 characterImage.src = "character.png";
@@ -240,6 +266,11 @@ const finalScoreDOM = document.getElementById("final-score");
 // Sound toggle
 const soundToggleDOM = document.getElementById("sound-toggle");
 
+// Special skills
+const skillsBarDOM = document.getElementById("skills-bar");
+const skillButtonsDOM = document.querySelectorAll(".skill-btn");
+const screenFlashDOM = document.getElementById("screen-flash");
+
 // All UI elements exist at this point - safe to apply mobile tweaks
 applyMobileOptimizations();
 
@@ -405,6 +436,89 @@ window.addEventListener("pointerdown", unlockAudio);
 window.addEventListener("keydown", unlockAudio);
 window.addEventListener("touchstart", unlockAudio, { passive: true });
 
+// ------------------------------------------------------------
+// Special skills: HUD, selection and helpers
+// ------------------------------------------------------------
+function skillPoolForCurrentPlayer() {
+  if (!state.skills) return null;
+  return state.skills[state.currentPlayer - 1] || null;
+}
+
+function renderSkills() {
+  const pool = skillPoolForCurrentPlayer() || { nuke: 0, rocket: 0 };
+
+  skillButtonsDOM.forEach((button) => {
+    const id = button.dataset.skill;
+    const count = pool[id] || 0;
+    const countDOM = button.querySelector(".skill-count");
+
+    if (countDOM) countDOM.textContent = `×${count}`;
+    button.classList.toggle("active", state.activeSkill === id);
+    button.classList.toggle("empty", count <= 0);
+    button.disabled = count <= 0;
+    button.setAttribute("aria-pressed", String(state.activeSkill === id));
+  });
+
+  if (skillsBarDOM) {
+    const humanTurn =
+      state.phase === "aiming" &&
+      settings.numberOfPlayers !== 0 &&
+      !(settings.numberOfPlayers === 1 && state.currentPlayer === 2);
+    skillsBarDOM.classList.toggle("disabled", !humanTurn);
+  }
+}
+
+function selectSkill(id) {
+  if (!isHumanTurn()) return;
+
+  const pool = skillPoolForCurrentPlayer();
+  if (!pool || !(pool[id] > 0)) return;
+
+  state.activeSkill = state.activeSkill === id ? null : id;
+  SoundEngine.playClick();
+  renderSkills();
+  draw();
+}
+
+// Push a few extra craters around an impact so big hits destroy more terrain
+function addBlastScars(x, y, radius, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+    const distance = radius * (0.25 + Math.random() * 0.75);
+    state.blastHoles.push({
+      x: x + Math.cos(angle) * distance,
+      y: y + Math.sin(angle) * distance,
+    });
+  }
+}
+
+function triggerFlash() {
+  if (!screenFlashDOM) return;
+  screenFlashDOM.classList.remove("active");
+  // Force a reflow so the animation can restart
+  void screenFlashDOM.offsetWidth;
+  screenFlashDOM.classList.add("active");
+  setTimeout(() => screenFlashDOM.classList.remove("active"), 520);
+}
+
+// What should the computer use on this turn?
+function chooseComputerSkill() {
+  const pool = skillPoolForCurrentPlayer();
+  if (!pool) return null;
+
+  const enemyIndex = state.currentPlayer === 1 ? 1 : 0;
+  const enemyHealth = state.players[enemyIndex].health;
+
+  if (pool.nuke > 0 && enemyHealth <= 45 && state.round >= 2) return "nuke";
+  if (pool.rocket > 0 && (enemyHealth <= 70 || state.round >= 3)) return "rocket";
+
+  return null;
+}
+
+skillButtonsDOM.forEach((button) => {
+  button.addEventListener("click", () => selectSkill(button.dataset.skill));
+});
+
 renderScores();
 applyColorMode();
 
@@ -420,6 +534,15 @@ function newGame() {
     lastHitPoint: null, // Track exact hit location for effect placement
     shake: 0, // Screen shake strength after an impact
     winnerAnnounced: false, // Make sure a win is only counted once
+
+    // Special skills (one pool per player)
+    skills: [
+      { ...STARTING_SKILLS },
+      { ...STARTING_SKILLS },
+    ],
+    activeSkill: null, // Skill picked in the HUD, used on the next throw
+    throwSkill: null,  // Skill attached to the bomb currently in flight
+    pendingSkill: null, // Skill chosen by the computer for its next throw
     bomb: {
       x: undefined,
       y: undefined,
@@ -534,6 +657,8 @@ function newGame() {
   // Reset the remembered keyboard aim for both players
   lastAim[0] = { angle: 45, speed: 90 };
   lastAim[1] = { angle: 45, speed: 90 };
+
+  renderSkills();
 
   draw();
 
@@ -1410,7 +1535,7 @@ function drawRoundedRect(context, x, y, width, height, radius) {
 }
 
 // Draw the impact effect at the given position (world coordinates)
-function drawExplosionEffect(x, y) {
+function drawExplosionEffect(x, y, size = 30) {
   const selectedEffect = gameOptions.effects.find(
     (effect) => effect.id === settings.effect
   );
@@ -1422,7 +1547,7 @@ function drawExplosionEffect(x, y) {
   function animateEffect() {
     // The scene is repainted every frame, so the effect does not smear
     // and it is drawn with the same flipped/scaled coordinate system.
-    draw(() => selectedEffect.draw(ctx, x, y, 30, effectProgress));
+    draw(() => selectedEffect.draw(ctx, x, y, size, effectProgress));
 
     effectProgress += 0.05;
 
@@ -1522,6 +1647,16 @@ function drawBomb() {
       ctx.beginPath();
       ctx.arc(0, 0, 6, 0, 2 * Math.PI);
       ctx.fill();
+    }
+
+    // Ring around the bomb while a special skill is armed
+    if (state.activeSkill && SKILLS[state.activeSkill]) {
+      ctx.strokeStyle = SKILLS[state.activeSkill].color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(0, 0, 13, 0, 2 * Math.PI);
+      ctx.stroke();
     }
   } else if (state.phase === "in flight") {
     // Get selected ball
@@ -1770,6 +1905,9 @@ window.addEventListener("keydown", function (event) {
 });
 
 function computerThrow() {
+  // The computer may spend one of its special skills
+  state.pendingSkill = chooseComputerSkill();
+
   const numberOfSimulations = 2 + state.round * 3;
   const bestThrow = runSimulations(numberOfSimulations);
 
@@ -1839,6 +1977,23 @@ function throwBomb() {
   // Guard against extra throws (double taps, input after the game ended)
   if (!simulationMode && state.phase !== "aiming") return;
 
+  // Attach and spend the special skill for this throw
+  if (!simulationMode) {
+    const chosen = state.activeSkill || state.pendingSkill || null;
+    const pool = state.skills[state.currentPlayer - 1];
+
+    if (chosen && pool && pool[chosen] > 0) {
+      state.throwSkill = chosen;
+      pool[chosen] -= 1;
+    } else {
+      state.throwSkill = null;
+    }
+
+    state.activeSkill = null;
+    state.pendingSkill = null;
+    renderSkills();
+  }
+
   // Reset hit tracking for both players at the start of each throw
   state.players[0].wasHitThisThrow = false;
   state.players[1].wasHitThisThrow = false;
@@ -1884,9 +2039,20 @@ function animate(timestamp) {
       // Draw explosion effect at the exact hit location
       const hitX = state.lastHitPoint ? state.lastHitPoint.x : state.bomb.x;
       const hitY = state.lastHitPoint ? state.lastHitPoint.y : state.bomb.y;
-      state.shake = 12;
-      drawExplosionEffect(hitX, hitY);
-      SoundEngine.playExplosion();
+      const throwSkill = SKILLS[state.throwSkill];
+      state.shake = throwSkill ? throwSkill.shake : 12;
+      drawExplosionEffect(
+        hitX,
+        hitY,
+        throwSkill ? throwSkill.explosionSize : 30
+      );
+      if (throwSkill) {
+        addBlastScars(hitX, hitY, throwSkill.blastRadius, throwSkill.blastHoles);
+      }
+      if (state.throwSkill === "nuke") triggerFlash();
+      SoundEngine.playExplosion(
+        state.throwSkill === "nuke" ? 3 : state.throwSkill === "rocket" ? 2 : 1
+      );
     }
 
     // Handle the case when we hit a building or the bomb got off-screen
@@ -1931,7 +2097,11 @@ function endTurn(computerDelay) {
   state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
   if (state.currentPlayer === 1) state.round += 1;
   state.phase = "aiming";
+  state.throwSkill = null;
+  state.activeSkill = null;
+  state.pendingSkill = null;
   initializeBombPosition();
+  renderSkills();
   draw();
 
   const computerThrowsNext =
@@ -2051,8 +2221,9 @@ function checkGorillaHit() {
     }
     
     if (!state.players[playerIndex].wasHitThisThrow) {
-      // Reduce health when hit
-      const damage = 25; // 25% damage per hit
+      // Reduce health when hit (special skills hurt a lot more)
+      const skill = SKILLS[state.throwSkill];
+      const damage = skill ? skill.damage : 25;
       state.players[playerIndex].health = Math.max(0, state.players[playerIndex].health - damage);
       state.players[playerIndex].isHit = true;
       state.players[playerIndex].hitTimer = 30; // Animation frames
@@ -2112,6 +2283,7 @@ function announceWinner() {
 
   // Persist the win and refresh the scoreboard + overlay
   recordWin(state.currentPlayer);
+  renderSkills();
   SoundEngine.playWin();
   showCongratulations();
 }

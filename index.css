@@ -795,3 +795,122 @@ canvas,
     font-size: 0.8em;
   }
 }
+
+/* ------------------------------------------------------------------
+   Special skills bar + nuke flash
+   ------------------------------------------------------------------ */
+
+#skills-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background-color: rgba(15, 22, 38, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  z-index: 30;
+  transition: opacity 0.25s, filter 0.25s;
+}
+
+#skills-bar.disabled {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+#skills-bar .skills-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-right: 2px;
+}
+
+.skill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.08);
+  color: white;
+  font-size: 12px;
+  line-height: 1;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.skill-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.skill-btn .skill-icon {
+  font-size: 14px;
+}
+
+.skill-btn .skill-count {
+  font-weight: bold;
+  color: #ffe082;
+}
+
+.skill-btn.active {
+  background-color: #e53935;
+  border-color: #ff8a80;
+  box-shadow: 0 0 14px rgba(229, 57, 53, 0.65);
+}
+
+.skill-btn.active .skill-count {
+  color: white;
+}
+
+.skill-btn.empty,
+.skill-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+#screen-flash {
+  position: fixed;
+  inset: 0;
+  background-color: white;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+#screen-flash.active {
+  animation: nuke-flash 0.45s ease-out;
+}
+
+@keyframes nuke-flash {
+  0% { opacity: 0.85; }
+  40% { opacity: 0.35; }
+  100% { opacity: 0; }
+}
+
+.special-hint {
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  #skills-bar {
+    bottom: 42px;
+    gap: 6px;
+    padding: 4px 8px;
+  }
+
+  #skills-bar .skills-label {
+    display: none;
+  }
+
+  .skill-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}

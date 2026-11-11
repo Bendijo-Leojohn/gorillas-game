@@ -6,6 +6,17 @@
 
 This build adds a few upgrades on top of the tutorial game:
 
+- **Special skills** – pick **Nuke** or **Rocket** in the HUD before you throw:
+  - **Nuke** (1 per game): 100 damage, an instant knockout, a huge crater in the
+    buildings, a white screen flash and a deep explosion sound.
+  - **Rocket** (2 per game): 45 damage and a bigger blast than a normal banana.
+  - The computer also spends its own specials when it gets desperate, and the
+    HUD dims while it is not your turn.
+- **10 characters and 12 terrains** to choose from in *Game Options*:
+  Classic Gorilla, Robot, Alien, Ninja, Pirate, Robot Cat, Knight, Wizard,
+  Dino, Yeti — across City, Mountains, Futuristic City, Mountain Range,
+  Ocean Islands, Bedrock Caverns, Desert, Candyland, Neon City, Jungle,
+  Arctic and Volcano.
 - **Sound effects + background music** are synthesized with the Web Audio API
   (`sound-engine.js`), so there are no `.mp3` files to load and no 404s.
   Use the **Sound On / Muted** button in the toolbar to mute everything.
@@ -33,6 +44,7 @@ This build adds a few upgrades on top of the tutorial game:
 | --- | --- |
 | Aim | Drag the bomb / gorilla hand, or `↑` `↓` `←` `→` |
 | Throw | Release the drag, or press `Space` |
+| Use a special | Click **Nuke** / **Rocket** in the bottom bar, then throw |
 | Game options | Character, terrain, projectile and effect pickers in the toolbar |
 | Sound | **Sound On / Muted** button |
 | Reset score | ↻ next to the scoreboard |
