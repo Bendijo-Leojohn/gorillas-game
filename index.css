@@ -631,3 +631,167 @@ button:hover {
   25% { transform: translateX(-5px); }
   75% { transform: translateX(5px); }
 }
+
+/* ------------------------------------------------------------------
+   v2 UI additions: scoreboard, sound toggle, control hint, readability
+   ------------------------------------------------------------------ */
+
+html,
+body {
+  overscroll-behavior: none;
+}
+
+canvas,
+#bomb-grab-area {
+  touch-action: none;
+}
+
+/* Scoreboard */
+#scoreboard {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background-color: rgba(15, 22, 38, 0.45);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  z-index: 30;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+#scoreboard .score-side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#scoreboard .score-name {
+  opacity: 0.85;
+  font-size: 0.85em;
+  text-transform: uppercase;
+}
+
+#scoreboard .score-value {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #ffe082;
+  min-width: 1ch;
+  text-align: center;
+}
+
+#scoreboard .score-separator {
+  opacity: 0.5;
+  font-size: 1.2em;
+}
+
+#score-reset {
+  pointer-events: auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 1em;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s, transform 0.2s, background-color 0.2s;
+}
+
+#score-reset:hover {
+  opacity: 1;
+  transform: rotate(-90deg);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Sound toggle */
+#sound-toggle.muted {
+  opacity: 0.6;
+}
+
+/* Keyboard hint under the instructions */
+.control-hint {
+  margin: 8px 0 0;
+  font-size: 0.85em;
+  opacity: 0.85;
+  letter-spacing: 0.02em;
+}
+
+.control-hint strong {
+  color: #ffe082;
+  font-weight: bold;
+}
+
+/* Slightly stronger contrast for the centered overlay text */
+#instructions {
+  text-align: center;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
+}
+
+/* Readability cards for the HUD */
+#info-left,
+#info-right {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background-color: rgba(15, 22, 38, 0.35);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+#wind-info {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background-color: rgba(15, 22, 38, 0.35);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+#settings {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background-color: rgba(15, 22, 38, 0.3);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+/* Winner overlay: round score */
+.final-score {
+  font-size: 1.1em;
+  font-weight: bold;
+  margin: 6px 0 12px;
+}
+
+/* Mobile layout tweaks */
+@media (max-width: 768px) {
+  #scoreboard {
+    top: 6px;
+    padding: 4px 10px;
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  #scoreboard .score-value {
+    font-size: 1.3em;
+  }
+
+  #info-left,
+  #info-right {
+    padding: 6px 10px;
+    border-radius: 10px;
+  }
+
+  /* Keep the top bar free for the HUD: scoreboard moves to the bottom */
+  #scoreboard {
+    top: auto;
+    bottom: 8px;
+  }
+
+  .control-hint {
+    font-size: 0.8em;
+  }
+}

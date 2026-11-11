@@ -2,6 +2,41 @@
 
 [![YouTube Tutorial: Gorillas](<./Screenshot - light.png>)](https://www.youtube.com/watch?v=2q5EufbUEQk)
 
+## What's new in this version
+
+This build adds a few upgrades on top of the tutorial game:
+
+- **Sound effects + background music** are synthesized with the Web Audio API
+  (`sound-engine.js`), so there are no `.mp3` files to load and no 404s.
+  Use the **Sound On / Muted** button in the toolbar to mute everything.
+- **Scoreboard** – wins are remembered per game mode in `localStorage`.
+  Click the ↻ button next to the score to reset it.
+- **Keyboard aiming** – `↑` / `↓` change the angle, `←` / `→` change the power
+  and `Space` (or `Enter`) throws. Dragging with the mouse or a finger still
+  works and both inputs share the same aim.
+- **Mobile aiming fixed** – the bomb keeps following your finger even when it
+  leaves the small grab area, and high-DPI screens no longer throw the aim off.
+- **Terrain-aware skies** – each terrain now paints its own sky colors, not
+  only its buildings.
+- **Impact effects** are rendered in the scene's coordinate system, so they
+  line up with the explosion and animate cleanly, plus a small screen shake.
+- **Your choices are saved** – character, terrain, projectile, effect and color
+  mode are restored the next time you open the game.
+- **Bug fixes** – the game no longer hangs when the last hit lands on the roof
+  line, a win can only be counted once, the mobile setup code no longer crashes
+  on load, the duplicate "Toggle Day/Night" button is gone and resizing keeps
+  the bomb grab area in the right place.
+
+### Controls
+
+| Action | Input |
+| --- | --- |
+| Aim | Drag the bomb / gorilla hand, or `↑` `↓` `←` `→` |
+| Throw | Release the drag, or press `Space` |
+| Game options | Character, terrain, projectile and effect pickers in the toolbar |
+| Sound | **Sound On / Muted** button |
+| Reset score | ↻ next to the scoreboard |
+
 Welcome to the source code repository for the Gorillas JavaScript Game Tutorial. There are multiple versions of this tutorial.
 
 - The simplified version you can find on [freeCodeCamp](https://www.freecodecamp.org/news/gorillas-game-in-javascript/). This is a comprehensive guide, yet it lacks several main features of the final game and the graphics is more stripped down.

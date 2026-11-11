@@ -18,9 +18,19 @@ let dragStartY = undefined;
 let previousAnimationTimestamp = undefined;
 let animationFrameRequestID = undefined;
 let delayTimeoutID = undefined;
+let effectAnimationID = undefined;
 
 let simulationMode = false;
 let simulationImpact = {};
+
+// Remember each player's last keyboard aim, so arrow keys keep their settings
+const lastAim = [
+  { angle: 45, speed: 90 },
+  { angle: 45, speed: 90 },
+];
+
+// Terrain the current buildings were generated with (set again in newGame)
+let builtTerrain = "city";
 
 const darkModeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -40,6 +50,64 @@ const settings = {
 const characterImage = new Image();
 characterImage.src = "character.png";
 
+// ------------------------------------------------------------
+// Preferences (remember character / terrain / ball / effect)
+// ------------------------------------------------------------
+const PREFERENCES_STORAGE_KEY = "gorillas-options-v1";
+const PERSISTED_SETTINGS = [
+  "terrain",
+  "ball",
+  "effect",
+  "player1Character",
+  "player2Character",
+  "mode",
+];
+
+function loadPreferences() {
+  let stored;
+  try {
+    stored = JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY));
+  } catch (error) {
+    return;
+  }
+  if (!stored || typeof stored !== "object") return;
+
+  PERSISTED_SETTINGS.forEach((key) => {
+    if (typeof stored[key] === "string") settings[key] = stored[key];
+  });
+
+  // Guard against options that no longer exist
+  if (!gameOptions.terrains.some((terrain) => terrain.id === settings.terrain)) {
+    settings.terrain = "city";
+  }
+  if (!gameOptions.balls.some((ball) => ball.id === settings.ball)) {
+    settings.ball = "banana";
+  }
+  if (!gameOptions.effects.some((effect) => effect.id === settings.effect)) {
+    settings.effect = "explosion";
+  }
+  ["player1Character", "player2Character"].forEach((key) => {
+    if (!gameOptions.characters.some((character) => character.id === settings[key])) {
+      settings[key] = "default";
+    }
+  });
+  if (!["light", "dark"].includes(settings.mode)) {
+    settings.mode = darkModeMediaQuery.matches ? "dark" : "light";
+  }
+}
+
+function savePreferences() {
+  try {
+    const snapshot = {};
+    PERSISTED_SETTINGS.forEach((key) => {
+      snapshot[key] = settings[key];
+    });
+    localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch (error) {
+    /* ignore */
+  }
+}
+
 // Device detection
 const isMobile = {
   Android: function() {
@@ -56,42 +124,52 @@ const isMobile = {
   }
 };
 
-// Apply mobile-specific optimizations if on a mobile device
-function applyMobileOptimizations() {
-  if (isMobile.any() || window.innerWidth < 768) {
-    // Enlarge the bomb grab area for easier touch
-    bombGrabAreaDOM.style.width = '45px';
-    bombGrabAreaDOM.style.height = '45px';
-    
-    // Make the windmill smaller on mobile
-    const windmill = document.getElementById('windmill');
-    windmill.style.width = '100px';
-    windmill.style.height = '120px';
-    
-    // Adjust game UI elements for mobile
-    document.getElementById('settings').classList.add('mobile-settings');
-    document.getElementById('wind-info').classList.add('mobile-wind-info');
-    
-    // Adjust info panels
-    const infoLeft = document.getElementById('info-left');
-    const infoRight = document.getElementById('info-right');
-    infoLeft.classList.add('mobile-info');
-    infoRight.classList.add('mobile-info');
-    
-    // Make instructions more visible on mobile
-    const instructions = document.getElementById('instructions');
-    instructions.classList.add('mobile-instructions');
-    
-    // Make sure player info is always visible
-    infoLeft.style.opacity = '1';
-    infoRight.style.opacity = '1';
-    
-    // Add touch-friendly class to the game
-    document.body.classList.add('touch-friendly');
-  }
+// Apply mobile-specific optimizations if on a mobile device.
+// NOTE: this is only called after the DOM references below exist.
+function isTouchDevice() {
+  return isMobile.any() || window.innerWidth < 768;
 }
 
-applyMobileOptimizations();
+function applyMobileOptimizations() {
+  if (!bombGrabAreaDOM) return;
+  if (!isTouchDevice()) return;
+
+  // Enlarge the bomb grab area for easier touch
+  bombGrabAreaDOM.style.width = '45px';
+  bombGrabAreaDOM.style.height = '45px';
+
+  // Make the windmill smaller on mobile
+  const windmill = document.getElementById('windmill');
+  if (windmill) {
+    windmill.style.width = '100px';
+    windmill.style.height = '120px';
+  }
+
+  // Adjust game UI elements for mobile
+  const settingsEl = document.getElementById('settings');
+  if (settingsEl) settingsEl.classList.add('mobile-settings');
+  const windInfoEl = document.getElementById('wind-info');
+  if (windInfoEl) windInfoEl.classList.add('mobile-wind-info');
+
+  // Adjust info panels
+  const infoLeft = document.getElementById('info-left');
+  const infoRight = document.getElementById('info-right');
+  if (infoLeft) {
+    infoLeft.classList.add('mobile-info');
+    infoLeft.style.opacity = '1';
+  }
+  if (infoRight) {
+    infoRight.classList.add('mobile-info');
+    infoRight.style.opacity = '1';
+  }
+
+  // Make instructions more visible on mobile
+  const instructions = document.getElementById('instructions');
+  if (instructions) instructions.classList.add('mobile-instructions');
+
+  // Add touch-friendly class to the game
+  document.body.classList.add('touch-friendly');
+}
 
 const blastHoleRadius = 18;
 
@@ -151,6 +229,23 @@ const ballOptionsContainer = document.getElementById("ball-options");
 const effectOptionsContainer = document.getElementById("effect-options");
 const optionsDoneButton = document.getElementById("options-done");
 
+// Scoreboard elements
+const scoreLeftNameDOM = document.getElementById("score-left-name");
+const scoreRightNameDOM = document.getElementById("score-right-name");
+const scoreLeftDOM = document.getElementById("score-left");
+const scoreRightDOM = document.getElementById("score-right");
+const scoreResetDOM = document.getElementById("score-reset");
+const finalScoreDOM = document.getElementById("final-score");
+
+// Sound toggle
+const soundToggleDOM = document.getElementById("sound-toggle");
+
+// All UI elements exist at this point - safe to apply mobile tweaks
+applyMobileOptimizations();
+
+// Restore the player's last choices before building the options panel
+loadPreferences();
+
 // Create Options Button
 const optionsButton = document.createElement("button");
 optionsButton.innerText = "Game Options";
@@ -167,31 +262,151 @@ optionsButton.addEventListener("click", () => {
 
 optionsDoneButton.addEventListener("click", () => {
   gameOptionsPanel.style.display = "none";
-  // Apply the changes and redraw
-  updateBuildingsForTerrain();
+  savePreferences();
+  SoundEngine.playClick();
+
+  // Only rebuild the city when the terrain actually changed
+  if (settings.terrain !== builtTerrain) {
+    updateBuildingsForTerrain();
+  }
+
   draw();
 });
 
 colorModeButtonDOM.addEventListener("click", () => {
-  if (settings.mode === "dark") {
-    settings.mode = "light";
-    colorModeButtonDOM.innerText = "Dark Mode";
-  } else {
-    settings.mode = "dark";
-    colorModeButtonDOM.innerText = "Light Mode";
-  }
+  settings.mode = settings.mode === "dark" ? "light" : "dark";
+  SoundEngine.playClick();
+  applyColorMode();
   draw();
 });
 
 darkModeMediaQuery.addEventListener("change", (e) => {
   settings.mode = e.matches ? "dark" : "light";
-  if (settings.mode === "dark") {
-    colorModeButtonDOM.innerText = "Light Mode";
-  } else {
-    colorModeButtonDOM.innerText = "Dark Mode";
-  }
+  applyColorMode();
   draw();
 });
+
+// Keep the page styling in sync with the canvas color mode
+function applyColorMode() {
+  const isDark = settings.mode === "dark";
+  document.body.classList.toggle("dark-mode", isDark);
+  document.body.classList.toggle("light-mode", !isDark);
+  colorModeButtonDOM.textContent = isDark ? "Light Mode" : "Dark Mode";
+}
+
+// ------------------------------------------------------------
+// Scores (persisted in localStorage, one scoreboard per mode)
+// ------------------------------------------------------------
+const SCORES_STORAGE_KEY = "gorillas-scores-v1";
+const SCORE_NAMES = {
+  single: ["You", "Computer"],
+  two: ["Player 1", "Player 2"],
+  auto: ["Computer 1", "Computer 2"],
+};
+
+function emptyScores() {
+  return { single: [0, 0], two: [0, 0], auto: [0, 0] };
+}
+
+function loadScores() {
+  const fallback = emptyScores();
+  try {
+    const stored = JSON.parse(localStorage.getItem(SCORES_STORAGE_KEY));
+    if (!stored || typeof stored !== "object") return fallback;
+    Object.keys(fallback).forEach((key) => {
+      if (
+        Array.isArray(stored[key]) &&
+        stored[key].length === 2 &&
+        stored[key].every((value) => Number.isFinite(value))
+      ) {
+        fallback[key] = stored[key].map((value) => Math.max(0, Math.floor(value)));
+      }
+    });
+  } catch (error) {
+    /* corrupted or blocked storage - start fresh */
+  }
+  return fallback;
+}
+
+let scores = loadScores();
+
+function saveScores() {
+  try {
+    localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(scores));
+  } catch (error) {
+    /* ignore */
+  }
+}
+
+function currentScoreKey() {
+  if (settings.numberOfPlayers === 0) return "auto";
+  if (settings.numberOfPlayers === 2) return "two";
+  return "single";
+}
+
+function renderScores() {
+  const key = currentScoreKey();
+  const names = SCORE_NAMES[key];
+  const values = scores[key];
+
+  if (scoreLeftNameDOM) scoreLeftNameDOM.textContent = names[0];
+  if (scoreRightNameDOM) scoreRightNameDOM.textContent = names[1];
+  if (scoreLeftDOM) scoreLeftDOM.textContent = values[0];
+  if (scoreRightDOM) scoreRightDOM.textContent = values[1];
+  if (finalScoreDOM) finalScoreDOM.textContent = `${values[0]} : ${values[1]}`;
+}
+
+function recordWin(player) {
+  const key = currentScoreKey();
+  if (!scores[key]) scores[key] = [0, 0];
+  scores[key][player - 1] += 1;
+  saveScores();
+  renderScores();
+}
+
+function resetScores() {
+  scores = emptyScores();
+  saveScores();
+  renderScores();
+}
+
+if (scoreResetDOM) {
+  scoreResetDOM.addEventListener("click", () => {
+    SoundEngine.playClick();
+    resetScores();
+  });
+}
+
+// ------------------------------------------------------------
+// Sound
+// ------------------------------------------------------------
+if (soundToggleDOM) {
+  SoundEngine.onChange((enabled) => {
+    soundToggleDOM.textContent = enabled ? "Sound On" : "Muted";
+    soundToggleDOM.classList.toggle("muted", !enabled);
+    soundToggleDOM.setAttribute("aria-pressed", String(enabled));
+  });
+
+  soundToggleDOM.addEventListener("click", () => {
+    SoundEngine.unlock();
+    SoundEngine.toggleMute();
+  });
+}
+
+// Browsers only allow audio after a user gesture
+function unlockAudio() {
+  SoundEngine.unlock();
+  window.removeEventListener("pointerdown", unlockAudio);
+  window.removeEventListener("keydown", unlockAudio);
+  window.removeEventListener("touchstart", unlockAudio);
+}
+
+window.addEventListener("pointerdown", unlockAudio);
+window.addEventListener("keydown", unlockAudio);
+window.addEventListener("touchstart", unlockAudio, { passive: true });
+
+renderScores();
+applyColorMode();
 
 newGame();
 
@@ -203,6 +418,8 @@ function newGame() {
     round: 1,
     windSpeed: generateWindSpeed(),
     lastHitPoint: null, // Track exact hit location for effect placement
+    shake: 0, // Screen shake strength after an impact
+    winnerAnnounced: false, // Make sure a win is only counted once
     bomb: {
       x: undefined,
       y: undefined,
@@ -246,22 +463,6 @@ function newGame() {
     state.stars.push({ x, y });
   }
 
-  // Add a day/night toggle button to the DOM
-  window.addEventListener('DOMContentLoaded', () => {
-    let toggleBtn = document.createElement('button');
-    toggleBtn.id = 'toggle-day-night';
-    toggleBtn.textContent = 'Toggle Day/Night';
-    toggleBtn.style.position = 'fixed';
-    toggleBtn.style.top = '10px';
-    toggleBtn.style.right = '10px';
-    toggleBtn.style.zIndex = 1000;
-    document.body.appendChild(toggleBtn);
-    toggleBtn.addEventListener('click', () => {
-      settings.mode = settings.mode === 'dark' ? 'light' : 'dark';
-      newGame();
-    });
-  });
-
   // Add birds and twinkling stars to state
   if (settings.mode === 'light') {
     // Add 3-5 birds for day mode
@@ -282,10 +483,22 @@ function newGame() {
     generateBackgroundBuilding(i);
   }
 
-  // Generate buildings
-  for (let i = 0; i < 8; i++) {
-    generateBuilding(i);
+  // Generate buildings with the currently selected terrain
+  const terrain = gameOptions.terrains.find(
+    (item) => item.id === settings.terrain
+  );
+  if (terrain && typeof terrain.generateBuilding === "function") {
+    for (let i = 0; i < 8; i++) {
+      state.buildings.push(
+        terrain.generateBuilding(i, state.buildings[i - 1])
+      );
+    }
+  } else {
+    for (let i = 0; i < 8; i++) {
+      generateBuilding(i);
+    }
   }
+  builtTerrain = settings.terrain;
 
   calculateScaleAndShift();
   initializeBombPosition();
@@ -294,6 +507,8 @@ function newGame() {
 
   // Cancel any ongoing animation and timeout
   cancelAnimationFrame(animationFrameRequestID);
+  cancelAnimationFrame(effectAnimationID);
+  effectAnimationID = undefined;
   clearTimeout(delayTimeoutID);
 
   // Reset HTML elements
@@ -316,6 +531,10 @@ function newGame() {
   simulationMode = false;
   simulationImpact = {};
 
+  // Reset the remembered keyboard aim for both players
+  lastAim[0] = { angle: 45, speed: 90 };
+  lastAim[1] = { angle: 45, speed: 90 };
+
   draw();
 
   if (settings.numberOfPlayers === 0) {
@@ -324,7 +543,6 @@ function newGame() {
 }
 
 function showInstructions() {
-  singlePlayerButtonDOM.checked = true;
   instructionsDOM.style.opacity = 1;
   instructionsDOM.style.visibility = "visible";
 }
@@ -401,28 +619,6 @@ function generateBuilding(index) {
   state.buildings.push({ x, width, height, lightsOn });
 }
 
-// Function to update buildings based on selected terrain
-function updateBuildingsForTerrain() {
-  // Find the selected terrain
-  const selectedTerrain = gameOptions.terrains.find(terrain => terrain.id === settings.terrain);
-  
-  if (!selectedTerrain) return; // Safety check
-  
-  // Clear existing buildings
-  state.buildings = [];
-  state.blastHoles = [];
-  
-  // Generate new buildings using the selected terrain's generator
-  for (let i = 0; i < 8; i++) {
-    const previousBuilding = state.buildings[i - 1];
-    const building = selectedTerrain.generateBuilding(i, previousBuilding);
-    state.buildings.push(building);
-  }
-  
-  // Recalculate scale and shift for the new buildings
-  calculateScaleAndShift();
-}
-
 function calculateScaleAndShift() {
   const lastBuilding = state.buildings.at(-1);
   const totalWidthOfTheCity = lastBuilding.x + lastBuilding.width;
@@ -464,32 +660,8 @@ function handleResize() {
   initializeBombPosition();
   initializeWindmillPosition();
   
-  // Reposition UI elements if needed
-  updateUIPositions();
-  
   // Redraw the game
   draw();
-}
-
-// Function to update UI positions based on current screen size
-function updateUIPositions() {
-  // Adjust the bomb grab area position
-  const building = state.currentPlayer === 1 
-    ? state.buildings.at(1) 
-    : state.buildings.at(-2);
-  
-  if (building) {
-    const buildingCenterX = building.x + building.width / 2;
-    const buildingTop = building.height;
-    
-    // Position the bomb grab area
-    const rect = canvas.getBoundingClientRect();
-    const grabAreaX = (buildingCenterX / canvas.width) * rect.width;
-    const grabAreaY = (buildingTop / canvas.height) * rect.height;
-    
-    bombGrabAreaDOM.style.left = `${grabAreaX - 22.5}px`;
-    bombGrabAreaDOM.style.top = `${grabAreaY - 75}px`;
-  }
 }
 
 function initializeBombPosition() {
@@ -535,12 +707,24 @@ function initializeWindmillPosition() {
   windInfoDOM.style.left = `${rooftopX - 50}px`;
 }
 
-function draw() {
+function draw(overlay) {
   ctx.save();
 
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
   drawBackgroundSky();
+
+  // Screen shake after an impact (decays every frame)
+  let shakeX = 0;
+  let shakeY = 0;
+  if (state.shake > 0.4) {
+    shakeX = (Math.random() - 0.5) * state.shake;
+    shakeY = (Math.random() - 0.5) * state.shake;
+    state.shake *= 0.82;
+    ctx.translate(shakeX, shakeY);
+  } else {
+    state.shake = 0;
+  }
 
   // Flip coordinate system upside down
   ctx.translate(0, window.innerHeight);
@@ -557,6 +741,9 @@ function draw() {
   drawGorilla(1);
   drawGorilla(2);
   drawBomb();
+
+  // Optional overlay (used for impact effects) - already in scene coordinates
+  if (typeof overlay === "function") overlay();
 
   // Restore transformation
   ctx.restore();
@@ -589,13 +776,19 @@ function updateHealthDisplay(player, health) {
 // Draw background sky, sun/moon, birds, and twinkling stars
 function drawBackgroundSky() {
   const gradient = ctx.createLinearGradient(0, 0, 0, window.innerHeight);
-  if (settings.mode === "dark") {
-    gradient.addColorStop(1, "#27507F");
-    gradient.addColorStop(0, "#58A8D8");
-  } else {
-    gradient.addColorStop(1, "#F8BA85");
-    gradient.addColorStop(0, "#FFC28E");
-  }
+
+  // Use the selected terrain's sky colors (falls back to the classic sky)
+  const terrain = gameOptions.terrains.find(
+    (item) => item.id === settings.terrain
+  );
+  const skyColors = terrain && terrain.colors
+    ? terrain.colors[settings.mode].sky
+    : settings.mode === "dark"
+      ? ["#27507F", "#58A8D8"]
+      : ["#F8BA85", "#FFC28E"];
+
+  gradient.addColorStop(0, skyColors[1]);
+  gradient.addColorStop(1, skyColors[0]);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
@@ -905,6 +1098,8 @@ function initializeGameOptionsPanel() {
       
       // Update settings for Player 1
       settings.player1Character = character.id;
+      savePreferences();
+      SoundEngine.playClick();
       
       // Also update global character if it's Player 1's turn
       if (state.currentPlayer === 1) {
@@ -973,6 +1168,8 @@ function initializeGameOptionsPanel() {
       
       // Update settings for Player 2
       settings.player2Character = character.id;
+      savePreferences();
+      SoundEngine.playClick();
       
       // Also update global character if it's Player 2's turn
       if (state.currentPlayer === 2) {
@@ -1074,6 +1271,8 @@ function initializeGameOptionsPanel() {
       
       // Update settings
       settings.terrain = terrain.id;
+      savePreferences();
+      SoundEngine.playClick();
       
       // Rebuild the game world with the new terrain
       updateBuildingsForTerrain();
@@ -1124,6 +1323,8 @@ function initializeGameOptionsPanel() {
       
       // Update settings
       settings.ball = ball.id;
+      savePreferences();
+      SoundEngine.playClick();
     });
   });
   
@@ -1159,6 +1360,8 @@ function initializeGameOptionsPanel() {
       
       // Update settings
       settings.effect = effect.id;
+      savePreferences();
+      SoundEngine.playClick();
     });
   });
 }
@@ -1181,23 +1384,30 @@ function updateBuildingsForTerrain() {
   // Get the selected terrain
   const terrain = gameOptions.terrains.find(t => t.id === settings.terrain);
   if (!terrain) return;
-  
-  // Reset buildings
+
+  // Reset buildings and the holes blown into the previous world
   state.buildings = [];
-  
+  state.blastHoles = [];
+
   // Generate buildings with the selected terrain's building generator
   for (let i = 0; i < 8; i++) {
     const previousBuilding = state.buildings[i - 1];
     const building = terrain.generateBuilding(i, previousBuilding);
     state.buildings.push(building);
   }
-  
+
   // Update scale and shift
   calculateScaleAndShift();
-  
-  // Reset gorilla positions
+
+  // Reset gorilla + windmill positions
   initializeBombPosition();
   initializeWindmillPosition();
+
+  // Clear keyboard aim so the next throw starts from a sane default
+  lastAim[0] = { angle: 45, speed: 90 };
+  lastAim[1] = { angle: 45, speed: 90 };
+
+  builtTerrain = settings.terrain;
 }
 
 // No longer needed as we're using the image instead
@@ -1220,33 +1430,32 @@ function drawRoundedRect(context, x, y, width, height, radius) {
   return context;
 }
 
-// Draw explosion effect at the given position
+// Draw the impact effect at the given position (world coordinates)
 function drawExplosionEffect(x, y) {
-  // Find the selected effect
-  const selectedEffect = gameOptions.effects.find(effect => effect.id === settings.effect);
-  
+  const selectedEffect = gameOptions.effects.find(
+    (effect) => effect.id === settings.effect
+  );
+
   if (!selectedEffect) return;
-  
-  // Create explosion animation
+
   let effectProgress = 0;
-  let animationId;
-  
+
   function animateEffect() {
-    // Draw the selected effect
-    selectedEffect.draw(ctx, x, y, 30, effectProgress);
-    
-    // Update progress
+    // The scene is repainted every frame, so the effect does not smear
+    // and it is drawn with the same flipped/scaled coordinate system.
+    draw(() => selectedEffect.draw(ctx, x, y, 30, effectProgress));
+
     effectProgress += 0.05;
-    
-    // Continue animation until complete
+
     if (effectProgress <= 1) {
-      animationId = requestAnimationFrame(animateEffect);
+      effectAnimationID = requestAnimationFrame(animateEffect);
     } else {
-      cancelAnimationFrame(animationId);
+      cancelAnimationFrame(effectAnimationID);
+      effectAnimationID = undefined;
+      draw(); // clean up the last frame
     }
   }
-  
-  // Start the animation
+
   animateEffect();
 }
 
@@ -1396,97 +1605,100 @@ function drawBomb() {
 
 // Mouse and Touch Event handlers
 function handleDragStart(clientX, clientY) {
+  if (state.phase !== "aiming") return;
+
+  // Ignore aiming while the computer is playing
+  if (settings.numberOfPlayers === 0) return;
+  if (settings.numberOfPlayers === 1 && state.currentPlayer === 2) return;
+
   hideInstructions();
-  if (state.phase === "aiming") {
-    isDragging = true;
-    document.body.style.cursor = "grabbing";
+  isDragging = true;
+  document.body.style.cursor = "grabbing";
 
-    // Calculate the direction and velocity based on pointer position
-    const rect = canvas.getBoundingClientRect();
-    const pointerX = (clientX - rect.left) * window.devicePixelRatio;
-    const pointerY = (clientY - rect.top) * window.devicePixelRatio;
+  // Store raw client coordinates: the delta is what matters, and mixing
+  // CSS pixels with devicePixelRatio broke aiming on retina screens.
+  dragStartX = clientX;
+  dragStartY = clientY;
+}
 
-    // Calculate center position of the current building
-    const building =
-      state.currentPlayer === 1
-        ? state.buildings.at(1)
-        : state.buildings.at(-2);
+function updateAimFromPointer(clientX, clientY) {
+  const deltaX = clientX - dragStartX;
+  const deltaY = clientY - dragStartY;
 
-    const buildingCenterX = building.x + building.width / 2;
-    const buildingTop = building.height;
+  state.bomb.velocity.x = -deltaX;
+  state.bomb.velocity.y = deltaY;
+  setInfo(deltaX, deltaY);
 
-    dragStartX = pointerX;
-    dragStartY = pointerY;
+  lastAim[state.currentPlayer - 1] = currentAim();
+
+  draw();
+}
+
+function endDrag() {
+  if (!isDragging) return;
+  isDragging = false;
+  document.body.style.cursor = "default";
+
+  // A tap without dragging should not fire a random shot
+  if (Math.hypot(state.bomb.velocity.x, state.bomb.velocity.y) < 6) {
+    initializeBombPosition();
+    draw();
+    return;
   }
+
+  throwBomb();
 }
 
 // Mouse event handlers
 bombGrabAreaDOM.addEventListener("mousedown", function (e) {
+  e.preventDefault();
   handleDragStart(e.clientX, e.clientY);
 });
 
-// Touch event handlers
-bombGrabAreaDOM.addEventListener("touchstart", function (e) {
-  // Prevent default to avoid scrolling while dragging
-  e.preventDefault();
-  if (e.touches && e.touches[0]) {
-    handleDragStart(e.touches[0].clientX, e.touches[0].clientY);
-  }
-});
-
 window.addEventListener("mousemove", function (e) {
-  if (isDragging) {
-    let deltaX = e.clientX - dragStartX;
-    let deltaY = e.clientY - dragStartY;
-
-    state.bomb.velocity.x = -deltaX;
-    state.bomb.velocity.y = deltaY;
-    setInfo(deltaX, deltaY);
-
-    draw();
-  }
+  if (isDragging) updateAimFromPointer(e.clientX, e.clientY);
 });
 
-// Touch event handlers
-bombGrabAreaDOM.addEventListener("touchmove", function (e) {
-  // Prevent default to avoid scrolling while dragging
-  e.preventDefault();
-  if (e.touches && e.touches[0]) {
-    if (isDragging) {
-      let deltaX = e.touches[0].clientX - dragStartX;
-      let deltaY = e.touches[0].clientY - dragStartY;
-
-      state.bomb.velocity.x = -deltaX;
-      state.bomb.velocity.y = deltaY;
-      setInfo(deltaX, deltaY);
-
-      draw();
-    }
-  }
-});
-
-// Mouse event handlers
 window.addEventListener("mouseup", function () {
-  if (isDragging) {
-    isDragging = false;
-    document.body.style.cursor = "default";
-
-    throwBomb();
-  }
+  endDrag();
 });
 
-// Touch event handlers
-bombGrabAreaDOM.addEventListener("touchend", function () {
-  if (isDragging) {
-    isDragging = false;
-    document.body.style.cursor = "default";
+// Touch event handlers - listening on window keeps the drag alive even
+// when the finger leaves the small grab area
+bombGrabAreaDOM.addEventListener(
+  "touchstart",
+  function (e) {
+    e.preventDefault();
+    if (e.touches && e.touches[0]) {
+      handleDragStart(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  },
+  { passive: false }
+);
 
-    throwBomb();
-  }
+window.addEventListener(
+  "touchmove",
+  function (e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    if (e.touches && e.touches[0]) {
+      updateAimFromPointer(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  },
+  { passive: false }
+);
+
+window.addEventListener("touchend", function () {
+  endDrag();
+});
+
+window.addEventListener("touchcancel", function () {
+  endDrag();
 });
 
 function setInfo(deltaX, deltaY) {
   const hypotenuse = Math.sqrt(deltaX ** 2 + deltaY ** 2);
+  if (hypotenuse === 0) return;
   const angleInRadians = Math.asin(deltaY / hypotenuse);
   const angleInDegrees = (angleInRadians / Math.PI) * 180;
 
@@ -1499,12 +1711,76 @@ function setInfo(deltaX, deltaY) {
   }
 }
 
-window.addEventListener("mouseup", function () {
-  if (isDragging) {
-    isDragging = false;
-    document.body.style.cursor = "default";
+// ------------------------------------------------------------
+// Keyboard aiming: arrow keys + space (great on laptops/trackpads)
+// ------------------------------------------------------------
+function isHumanTurn() {
+  if (gameOptionsPanel && gameOptionsPanel.style.display === "block") return false;
+  if (state.phase !== "aiming") return false;
+  if (settings.numberOfPlayers === 0) return false;
+  if (settings.numberOfPlayers === 1 && state.currentPlayer === 2) return false;
+  return true;
+}
 
-    throwBomb();
+// Read the current angle/speed from the bomb velocity
+function currentAim() {
+  const velocity = state.bomb.velocity;
+  const speed = Math.hypot(velocity.x, velocity.y);
+
+  if (speed < 1) {
+    return { ...lastAim[state.currentPlayer - 1] };
+  }
+
+  const angle = (Math.atan2(Math.abs(velocity.y), Math.abs(velocity.x)) * 180) / Math.PI;
+  return { angle, speed };
+}
+
+function applyAim(angle, speed) {
+  // Keep the shot inside sensible limits
+  angle = Math.min(89, Math.max(0, angle));
+  speed = Math.min(220, Math.max(10, speed));
+
+  const radians = (angle * Math.PI) / 180;
+  const direction = state.currentPlayer === 1 ? 1 : -1;
+
+  state.bomb.velocity.x = Math.cos(radians) * speed * direction;
+  state.bomb.velocity.y = Math.sin(radians) * speed;
+
+  lastAim[state.currentPlayer - 1] = { angle, speed };
+  setInfo(-state.bomb.velocity.x, state.bomb.velocity.y);
+  hideInstructions();
+  draw();
+}
+
+const AIM_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Enter"];
+
+window.addEventListener("keydown", function (event) {
+  if (!AIM_KEYS.includes(event.key)) return;
+  if (!isHumanTurn()) return;
+
+  event.preventDefault();
+  const aim = currentAim();
+
+  switch (event.key) {
+    case "ArrowUp":
+      applyAim(aim.angle + 2, aim.speed);
+      break;
+    case "ArrowDown":
+      applyAim(aim.angle - 2, aim.speed);
+      break;
+    case "ArrowRight":
+      applyAim(aim.angle, aim.speed + 5);
+      break;
+    case "ArrowLeft":
+      applyAim(aim.angle, aim.speed - 5);
+      break;
+    case " ":
+    case "Enter":
+      if (Math.hypot(state.bomb.velocity.x, state.bomb.velocity.y) < 1) {
+        applyAim(aim.angle, aim.speed);
+      }
+      throwBomb();
+      break;
   }
 });
 
@@ -1575,6 +1851,9 @@ function runSimulations(numberOfSimulations) {
 }
 
 function throwBomb() {
+  // Guard against extra throws (double taps, input after the game ended)
+  if (!simulationMode && state.phase !== "aiming") return;
+
   // Reset hit tracking for both players at the start of each throw
   state.players[0].wasHitThisThrow = false;
   state.players[1].wasHitThisThrow = false;
@@ -1587,7 +1866,7 @@ function throwBomb() {
     previousAnimationTimestamp = undefined;
     animationFrameRequestID = requestAnimationFrame(animate);
   }
-  playThrowSound();
+  SoundEngine.playThrow();
 }
 
 function animate(timestamp) {
@@ -1620,55 +1899,34 @@ function animate(timestamp) {
       // Draw explosion effect at the exact hit location
       const hitX = state.lastHitPoint ? state.lastHitPoint.x : state.bomb.x;
       const hitY = state.lastHitPoint ? state.lastHitPoint.y : state.bomb.y;
+      state.shake = 12;
       drawExplosionEffect(hitX, hitY);
-      playHitSound();
+      SoundEngine.playExplosion();
     }
 
     // Handle the case when we hit a building or the bomb got off-screen
-    if (miss) {
-      state.currentPlayer = state.currentPlayer === 1 ? 2 : 1; // Switch players
-      if (state.currentPlayer === 1) state.round++;
-      state.phase = "aiming";
-      initializeBombPosition();
+    const enemyPlayer = state.currentPlayer === 1 ? 2 : 1;
+    const enemyDefeated =
+      hit && state.players[enemyPlayer - 1].health <= 0;
 
+    // The gorilla stands on the roof, so a bomb can touch the gorilla and
+    // the building at the same time. A defeat always wins over a miss.
+    if (enemyDefeated) {
+      state.phase = "celebrating";
+      announceWinner();
       draw();
-
-      const computerThrowsNext =
-        settings.numberOfPlayers === 0 ||
-        (settings.numberOfPlayers === 1 && state.currentPlayer === 2);
-
-      if (computerThrowsNext) setTimeout(computerThrow, 50);
-
       return;
     }
 
-    // Handle the case when we hit the enemy
-    if (hit) {
-      const enemyPlayer = state.currentPlayer === 1 ? 2 : 1;
-      const playerIndex = enemyPlayer - 1;
-      
-      if (state.players[playerIndex].health <= 0) {
-        // Enemy defeated
-        state.phase = "celebrating";
-        announceWinner();
-        draw();
-        return;
-      } else {
-        // Enemy hit but not defeated - switch turns
-        state.currentPlayer = state.currentPlayer === 1 ? 2 : 1; // Switch players
-        if (state.currentPlayer === 1) state.round++;
-        state.phase = "aiming";
-        initializeBombPosition();
-        draw();
-        
-        const computerThrowsNext =
-          settings.numberOfPlayers === 0 ||
-          (settings.numberOfPlayers === 1 && state.currentPlayer === 2);
+    if (miss) {
+      endTurn(50);
+      return;
+    }
 
-        if (computerThrowsNext) setTimeout(computerThrow, 1000); // Delay for hit animation
-        
-        return;
-      }
+    // Handle the case when we hit the enemy but it is not defeated yet
+    if (hit) {
+      endTurn(1000); // Delay so the hit animation is visible
+      return;
     }
   }
 
@@ -1681,6 +1939,21 @@ function animate(timestamp) {
   } else {
     animationFrameRequestID = requestAnimationFrame(animate);
   }
+}
+
+// Finish a turn: switch players and hand over to the computer if needed
+function endTurn(computerDelay) {
+  state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
+  if (state.currentPlayer === 1) state.round += 1;
+  state.phase = "aiming";
+  initializeBombPosition();
+  draw();
+
+  const computerThrowsNext =
+    settings.numberOfPlayers === 0 ||
+    (settings.numberOfPlayers === 1 && state.currentPlayer === 2);
+
+  if (computerThrowsNext) setTimeout(computerThrow, computerDelay);
 }
 
 function moveBomb(elapsedTime) {
@@ -1801,10 +2074,7 @@ function checkGorillaHit() {
       state.players[playerIndex].wasHitThisThrow = true; // Mark as hit this throw
       
       // Play hit sound
-      if (hitSound) {
-        hitSound.currentTime = 0; // Rewind to start in case it's already playing
-        hitSound.play().catch(e => console.log('Audio play failed:', e));
-      }
+      SoundEngine.playHit();
       
       // Update health display for the HIT player (enemy)
       updateHealthDisplay(enemyPlayer, state.players[playerIndex].health);
@@ -1842,6 +2112,9 @@ function checkGorillaHit() {
 }
 
 function announceWinner() {
+  if (state.winnerAnnounced) return;
+  state.winnerAnnounced = true;
+
   if (settings.numberOfPlayers === 0) {
     winnerDOM.innerText = `Computer ${state.currentPlayer}`;
   } else if (settings.numberOfPlayers === 1 && state.currentPlayer === 1) {
@@ -1851,6 +2124,10 @@ function announceWinner() {
   } else {
     winnerDOM.innerText = `Player ${state.currentPlayer}`;
   }
+
+  // Persist the win and refresh the scoreboard + overlay
+  recordWin(state.currentPlayer);
+  SoundEngine.playWin();
   showCongratulations();
 }
 
@@ -1861,6 +2138,8 @@ singlePlayerButtonDOM.forEach((button) =>
     name1DOM.innerText = "Player";
     name2DOM.innerText = "Computer";
 
+    SoundEngine.playClick();
+    renderScores();
     newGame();
   })
 );
@@ -1872,6 +2151,8 @@ twoPlayersButtonDOM.forEach((button) =>
     name1DOM.innerText = "Player 1";
     name2DOM.innerText = "Player 2";
 
+    SoundEngine.playClick();
+    renderScores();
     newGame();
   })
 );
@@ -1882,6 +2163,8 @@ autoPlayButtonDOM.forEach((button) =>
     name1DOM.innerText = "Computer 1";
     name2DOM.innerText = "Computer 2";
 
+    SoundEngine.playClick();
+    renderScores();
     newGame();
   })
 );
@@ -1921,32 +2204,5 @@ function toggleFullscreen() {
   }
 }
 
-// Audio elements
-let bgMusic, hitSound, throwSound;
-window.addEventListener('DOMContentLoaded', () => {
-  bgMusic = document.getElementById('bg-music');
-  hitSound = document.getElementById('hit-sound');
-  throwSound = document.getElementById('throw-sound');
-
-  // Try to play background music (user gesture required in some browsers)
-  if (bgMusic) {
-    bgMusic.volume = 0.5;
-    document.body.addEventListener('click', () => {
-      if (bgMusic.paused) bgMusic.play().catch(()=>{});
-    }, { once: true });
-  }
-});
-
-function playThrowSound() {
-  if (throwSound) {
-    throwSound.currentTime = 0;
-    throwSound.play().catch(()=>{});
-  }
-}
-
-function playHitSound() {
-  if (hitSound) {
-    hitSound.currentTime = 0;
-    hitSound.play().catch(()=>{});
-  }
-}
+// Sound effects are synthesized by sound-engine.js, so there are no
+// audio files to load and no 404s in the console.
