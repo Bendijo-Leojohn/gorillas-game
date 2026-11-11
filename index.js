@@ -1421,21 +1421,30 @@ function drawShields() {
     if (!home) return;
 
     const centreX = home.x + home.width / 2;
-    const centreY = home.height + 46;
+    const centreY = home.height - 26;
     const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 220);
+    const radiusX = 52 + pulse * 3;
+    const radiusY = 92 + pulse * 4;
 
     ctx.save();
-    ctx.globalAlpha = 0.18 + pulse * 0.12;
+    ctx.globalAlpha = 0.14 + pulse * 0.1;
     ctx.fillStyle = "#4FC3F7";
     ctx.beginPath();
-    ctx.ellipse(centreX, centreY, 46 + pulse * 3, 62 + pulse * 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(centreX, centreY, radiusX, radiusY, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.globalAlpha = 0.7;
+    ctx.globalAlpha = 0.85;
     ctx.strokeStyle = "#81D4FA";
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.ellipse(centreX, centreY, 46 + pulse * 3, 62 + pulse * 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(centreX, centreY, radiusX, radiusY, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Soft inner glow so the bubble reads even on a dark sky
+    ctx.globalAlpha = 0.18;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.ellipse(centreX, centreY, radiusX - 3, radiusY - 3, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   });
@@ -1537,8 +1546,8 @@ function drawMissileTrail() {
   trail.forEach((point, index) => {
     const t = index / Math.max(1, trail.length);
     ctx.save();
-    ctx.globalAlpha = 0.04 + t * 0.32;
-    ctx.fillStyle = "#CFD8DC";
+    ctx.globalAlpha = 0.06 + t * 0.45;
+    ctx.fillStyle = settings.mode === "dark" ? "#CFD8DC" : "#ECEFF1";
     ctx.beginPath();
     ctx.arc(point.x, point.y, 2 + t * 6, 0, Math.PI * 2);
     ctx.fill();
