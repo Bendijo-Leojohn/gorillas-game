@@ -2,6 +2,63 @@
 
 [![YouTube Tutorial: Gorillas](<./Screenshot - light.png>)](https://www.youtube.com/watch?v=2q5EufbUEQk)
 
+## What's new in this version
+
+This build adds a few upgrades on top of the tutorial game:
+
+- **Two castles, one winner** – each player now stands on their own castle at
+  opposite edges of a 1500-unit battlefield (about 900 units apart). Castles are
+  built from curtain walls, a central keep and battlements, all destructible:
+  every hit carves craters and rubble out of the stone until someone lands a
+  hit on the enemy.
+- **Special skills** – pick **Nuke**, **Missile** or **Shield** in the HUD:
+  - **Nuke** (1 per game): 100 damage, an instant knockout, a huge crater in the
+    castles, a white screen flash and a deep explosion sound.
+  - **Missile** (2 per game): 45 damage, a bigger blast, and the projectile
+    itself becomes a real missile — pointed nose cone, tail fins, exhaust flame
+    and a smoke trail that follows its flight path.
+  - **Shield** (2 per game): raises a glowing bubble around the player's castle
+    for **10 seconds** (countdown in the HUD and in the health card). A shielded
+    player takes **no damage** from the next hit — the bubble ripples, pops and
+    the shield is gone. The computer raises its own shield when it is hurt or
+    when it sees a charged nuke, and the HUD dims while it is not your turn.
+- **10 characters and 12 terrains** to choose from in *Game Options*:
+  Classic Gorilla, Robot, Alien, Ninja, Pirate, Robot Cat, Knight, Wizard,
+  Dino, Yeti — across City, Mountains, Futuristic City, Mountain Range,
+  Ocean Islands, Bedrock Caverns, Desert, Candyland, Neon City, Jungle,
+  Arctic and Volcano.
+- **Sound effects + background music** are synthesized with the Web Audio API
+  (`sound-engine.js`), so there are no `.mp3` files to load and no 404s.
+  Use the **Sound On / Muted** button in the toolbar to mute everything.
+- **Scoreboard** – wins are remembered per game mode in `localStorage`.
+  Click the ↻ button next to the score to reset it.
+- **Keyboard aiming** – `↑` / `↓` change the angle, `←` / `→` change the power
+  and `Space` (or `Enter`) throws. Dragging with the mouse or a finger still
+  works and both inputs share the same aim.
+- **Mobile aiming fixed** – the bomb keeps following your finger even when it
+  leaves the small grab area, and high-DPI screens no longer throw the aim off.
+- **Terrain-aware skies** – each terrain now paints its own sky colors, not
+  only its buildings.
+- **Impact effects** are rendered in the scene's coordinate system, so they
+  line up with the explosion and animate cleanly, plus a small screen shake.
+- **Your choices are saved** – character, terrain, projectile, effect and color
+  mode are restored the next time you open the game.
+- **Bug fixes** – the game no longer hangs when the last hit lands on the roof
+  line, a win can only be counted once, the mobile setup code no longer crashes
+  on load, the duplicate "Toggle Day/Night" button is gone and resizing keeps
+  the bomb grab area in the right place.
+
+### Controls
+
+| Action | Input |
+| --- | --- |
+| Aim | Drag the bomb / gorilla hand, or `↑` `↓` `←` `→` |
+| Throw | Release the drag, or press `Space` |
+| Use a special | Click **Nuke** / **Missile** / **Shield** in the bottom bar, then throw |
+| Game options | Character, terrain, projectile and effect pickers in the toolbar |
+| Sound | **Sound On / Muted** button |
+| Reset score | ↻ next to the scoreboard |
+
 Welcome to the source code repository for the Gorillas JavaScript Game Tutorial. There are multiple versions of this tutorial.
 
 - The simplified version you can find on [freeCodeCamp](https://www.freecodecamp.org/news/gorillas-game-in-javascript/). This is a comprehensive guide, yet it lacks several main features of the final game and the graphics is more stripped down.

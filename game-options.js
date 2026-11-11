@@ -482,6 +482,325 @@ const gameOptions = {
         ctx.stroke();
         ctx.restore();
       }
+    },
+    {
+      id: 'knight',
+      name: 'Knight',
+      type: 'code',
+      draw: function(ctx, flipped, aimingData = {}) {
+        const scale = flipped ? -1 : 1;
+        ctx.save();
+        ctx.scale(scale, 1);
+        // Legs
+        ctx.strokeStyle = '#78909C';
+        ctx.lineWidth = 9;
+        ctx.beginPath();
+        ctx.moveTo(-8 * scale, -34);
+        ctx.lineTo(-10 * scale, -4);
+        ctx.moveTo(8 * scale, -34);
+        ctx.lineTo(10 * scale, -4);
+        ctx.stroke();
+        // Body armour
+        ctx.fillStyle = '#B0BEC5';
+        ctx.beginPath();
+        ctx.moveTo(-22 * scale, -35);
+        ctx.lineTo(-18 * scale, -88);
+        ctx.lineTo(18 * scale, -88);
+        ctx.lineTo(22 * scale, -35);
+        ctx.closePath();
+        ctx.fill();
+        // Chest plate highlight
+        ctx.fillStyle = '#CFD8DC';
+        ctx.beginPath();
+        ctx.moveTo(-8 * scale, -84);
+        ctx.lineTo(8 * scale, -84);
+        ctx.lineTo(6 * scale, -42);
+        ctx.lineTo(-6 * scale, -42);
+        ctx.closePath();
+        ctx.fill();
+        // Helmet
+        ctx.fillStyle = '#90A4AE';
+        ctx.beginPath();
+        ctx.arc(0, -108, 20, Math.PI, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillRect(-20 * scale, -108, 40 * scale, 16);
+        // Visor slit
+        ctx.fillStyle = '#263238';
+        ctx.fillRect(-14 * scale, -104, 28 * scale, 6);
+        // Eyes glow
+        ctx.fillStyle = '#4FC3F7';
+        ctx.fillRect(-9 * scale, -103, 5, 4);
+        ctx.fillRect(4 * scale, -103, 5, 4);
+        // Red plume
+        ctx.fillStyle = '#E53935';
+        ctx.beginPath();
+        ctx.moveTo(0, -126);
+        ctx.quadraticCurveTo(-4 * scale, -146, 10 * scale, -150);
+        ctx.quadraticCurveTo(4 * scale, -136, 4 * scale, -124);
+        ctx.closePath();
+        ctx.fill();
+        // Arms
+        ctx.strokeStyle = '#90A4AE';
+        ctx.lineWidth = 9;
+        ctx.beginPath();
+        ctx.moveTo(-18 * scale, -80);
+        ctx.lineTo(-34 * scale, -92);
+        ctx.moveTo(18 * scale, -80);
+        ctx.lineTo(34 * scale, -66);
+        ctx.stroke();
+        // Sword
+        ctx.strokeStyle = '#ECEFF1';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(34 * scale, -66);
+        ctx.lineTo(52 * scale, -112);
+        ctx.stroke();
+        ctx.strokeStyle = '#FFC107';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(30 * scale, -72);
+        ctx.lineTo(40 * scale, -66);
+        ctx.stroke();
+        // Shield
+        ctx.fillStyle = '#5D4037';
+        ctx.beginPath();
+        ctx.ellipse(-36 * scale, -80, 10, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#FFC107';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(-36 * scale, -80, 10, 16, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    },
+    {
+      id: 'wizard',
+      name: 'Wizard',
+      type: 'code',
+      draw: function(ctx, flipped, aimingData = {}) {
+        const scale = flipped ? -1 : 1;
+        ctx.save();
+        ctx.scale(scale, 1);
+        // Robe
+        ctx.fillStyle = '#5E35B1';
+        ctx.beginPath();
+        ctx.moveTo(-26 * scale, 0);
+        ctx.lineTo(-16 * scale, -92);
+        ctx.lineTo(16 * scale, -92);
+        ctx.lineTo(26 * scale, 0);
+        ctx.closePath();
+        ctx.fill();
+        // Robe trim
+        ctx.fillStyle = '#9575CD';
+        ctx.fillRect(-26 * scale, -8, 52 * scale, 8);
+        // Head
+        ctx.fillStyle = '#FFCC9C';
+        ctx.beginPath();
+        ctx.arc(0, -108, 17, 0, Math.PI * 2);
+        ctx.fill();
+        // Beard
+        ctx.fillStyle = '#F5F5F5';
+        ctx.beginPath();
+        ctx.moveTo(-14 * scale, -104);
+        ctx.quadraticCurveTo(0, -58, 14 * scale, -104);
+        ctx.quadraticCurveTo(0, -92, -14 * scale, -104);
+        ctx.fill();
+        // Eyes
+        ctx.fillStyle = '#263238';
+        ctx.beginPath();
+        ctx.arc(-6 * scale, -112, 2.5, 0, Math.PI * 2);
+        ctx.arc(6 * scale, -112, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        // Hat
+        ctx.fillStyle = '#4527A0';
+        ctx.beginPath();
+        ctx.moveTo(-24 * scale, -118);
+        ctx.lineTo(4 * scale, -158);
+        ctx.lineTo(10 * scale, -118);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(0, -118, 26, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Hat star
+        ctx.fillStyle = '#FFD54F';
+        ctx.beginPath();
+        ctx.arc(2 * scale, -132, 3, 0, Math.PI * 2);
+        ctx.fill();
+        // Arms
+        ctx.strokeStyle = '#5E35B1';
+        ctx.lineWidth = 9;
+        ctx.beginPath();
+        ctx.moveTo(-16 * scale, -80);
+        ctx.lineTo(-34 * scale, -96);
+        ctx.moveTo(16 * scale, -80);
+        ctx.lineTo(34 * scale, -72);
+        ctx.stroke();
+        // Staff with a glowing orb
+        ctx.strokeStyle = '#8D6E63';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(-38 * scale, 0);
+        ctx.lineTo(-38 * scale, -120);
+        ctx.stroke();
+        ctx.fillStyle = '#80DEEA';
+        ctx.beginPath();
+        ctx.arc(-38 * scale, -124, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    },
+    {
+      id: 'dino',
+      name: 'Dino',
+      type: 'code',
+      draw: function(ctx, flipped, aimingData = {}) {
+        const scale = flipped ? -1 : 1;
+        ctx.save();
+        ctx.scale(scale, 1);
+        // Tail
+        ctx.strokeStyle = '#2E7D32';
+        ctx.lineWidth = 12;
+        ctx.beginPath();
+        ctx.moveTo(-14 * scale, -46);
+        ctx.quadraticCurveTo(-46 * scale, -46, -54 * scale, -14);
+        ctx.stroke();
+        // Body
+        ctx.fillStyle = '#43A047';
+        ctx.beginPath();
+        ctx.ellipse(0, -62, 24, 34, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Belly
+        ctx.fillStyle = '#A5D6A7';
+        ctx.beginPath();
+        ctx.ellipse(0, -54, 14, 22, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Head
+        ctx.fillStyle = '#43A047';
+        ctx.beginPath();
+        ctx.ellipse(2 * scale, -108, 20, 17, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Snout
+        ctx.beginPath();
+        ctx.ellipse(16 * scale, -102, 10, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Eye
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(4 * scale, -114, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1B5E20';
+        ctx.beginPath();
+        ctx.arc(6 * scale, -114, 3, 0, Math.PI * 2);
+        ctx.fill();
+        // Spikes
+        ctx.fillStyle = '#1B5E20';
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(i * 10 * scale - 4, -88);
+          ctx.lineTo(i * 10 * scale, -100);
+          ctx.lineTo(i * 10 * scale + 4, -88);
+          ctx.closePath();
+          ctx.fill();
+        }
+        // Little arms
+        ctx.strokeStyle = '#2E7D32';
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.moveTo(-18 * scale, -74);
+        ctx.lineTo(-32 * scale, -84);
+        ctx.moveTo(18 * scale, -74);
+        ctx.lineTo(32 * scale, -64);
+        ctx.stroke();
+        // Feet
+        ctx.fillStyle = '#2E7D32';
+        ctx.beginPath();
+        ctx.ellipse(-10 * scale, -6, 12, 6, 0, 0, Math.PI * 2);
+        ctx.ellipse(10 * scale, -6, 12, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    },
+    {
+      id: 'yeti',
+      name: 'Yeti',
+      type: 'code',
+      draw: function(ctx, flipped, aimingData = {}) {
+        const scale = flipped ? -1 : 1;
+        ctx.save();
+        ctx.scale(scale, 1);
+        // Fur body
+        ctx.fillStyle = '#E3F2FD';
+        ctx.beginPath();
+        ctx.ellipse(0, -58, 30, 40, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Fur tufts
+        ctx.fillStyle = '#BBDEFB';
+        ctx.beginPath();
+        ctx.ellipse(-24 * scale, -50, 10, 14, 0.4, 0, Math.PI * 2);
+        ctx.ellipse(24 * scale, -50, 10, 14, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+        // Head
+        ctx.fillStyle = '#F5FBFF';
+        ctx.beginPath();
+        ctx.arc(0, -108, 22, 0, Math.PI * 2);
+        ctx.fill();
+        // Face patch
+        ctx.fillStyle = '#CFE8F7';
+        ctx.beginPath();
+        ctx.ellipse(2 * scale, -104, 15, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Eyes
+        ctx.fillStyle = '#0D47A1';
+        ctx.beginPath();
+        ctx.arc(-6 * scale, -110, 4, 0, Math.PI * 2);
+        ctx.arc(8 * scale, -110, 4, 0, Math.PI * 2);
+        ctx.fill();
+        // Mouth with fangs
+        ctx.strokeStyle = '#37474F';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(1 * scale, -98, 6, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.moveTo(-3 * scale, -97);
+        ctx.lineTo(-1 * scale, -92);
+        ctx.lineTo(1 * scale, -97);
+        ctx.closePath();
+        ctx.fill();
+        // Horns
+        ctx.fillStyle = '#B0BEC5';
+        ctx.beginPath();
+        ctx.moveTo(-14 * scale, -124);
+        ctx.lineTo(-20 * scale, -142);
+        ctx.lineTo(-6 * scale, -126);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(14 * scale, -124);
+        ctx.lineTo(20 * scale, -142);
+        ctx.lineTo(6 * scale, -126);
+        ctx.closePath();
+        ctx.fill();
+        // Arms
+        ctx.strokeStyle = '#E3F2FD';
+        ctx.lineWidth = 12;
+        ctx.beginPath();
+        ctx.moveTo(-24 * scale, -72);
+        ctx.lineTo(-40 * scale, -92);
+        ctx.moveTo(24 * scale, -72);
+        ctx.lineTo(40 * scale, -60);
+        ctx.stroke();
+        // Feet
+        ctx.fillStyle = '#BBDEFB';
+        ctx.beginPath();
+        ctx.ellipse(-12 * scale, -6, 13, 7, 0, 0, Math.PI * 2);
+        ctx.ellipse(12 * scale, -6, 13, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     }
   ],
   
@@ -815,14 +1134,14 @@ const gameOptions = {
       },
       colors: {
         light: {
-          sky: ['#FFE082', '#FFD54F'],
-          buildings: '#FFD54F',
-          windows: '#FFF8E1'
+          sky: ['#FFE0A3', '#FFC46B'],
+          buildings: '#B5651D',
+          windows: '#FFEBC2'
         },
         dark: {
-          sky: ['#A1887F', '#6D4C41'],
-          buildings: '#A1887F',
-          windows: '#FFF8E1'
+          sky: ['#2B1B12', '#7A4B2A'],
+          buildings: '#4A2C1A',
+          windows: '#FFB74D'
         }
       }
     },
@@ -860,6 +1179,138 @@ const gameOptions = {
           sky: ['#8E24AA', '#F06292'],
           buildings: '#BA68C8',
           windows: '#FFF176'
+        }
+      }
+    },
+    {
+      id: 'neon',
+      name: 'Neon City',
+      generateBuilding: function(index, previousBuilding) {
+        const x = previousBuilding
+          ? previousBuilding.x + previousBuilding.width + 4
+          : 0;
+        const minWidth = 45;
+        const maxWidth = 85;
+        const width = minWidth + Math.random() * (maxWidth - minWidth);
+        const tallTower = index > 1 && index < 6;
+        const height = tallTower
+          ? 160 + Math.random() * 140
+          : 45 + Math.random() * 90;
+        const lightsOn = [];
+        for (let i = 0; i < 50; i++) {
+          lightsOn.push(Math.random() < 0.55);
+        }
+        return { x, width, height, lightsOn };
+      },
+      colors: {
+        light: {
+          sky: ['#4A0F6B', '#FF6EC7'],
+          buildings: '#1B0B2E',
+          windows: '#00E5FF'
+        },
+        dark: {
+          sky: ['#12001F', '#7B1FA2'],
+          buildings: '#0A0416',
+          windows: '#FF2A6D'
+        }
+      }
+    },
+    {
+      id: 'jungle',
+      name: 'Jungle',
+      generateBuilding: function(index, previousBuilding) {
+        const x = previousBuilding
+          ? previousBuilding.x + previousBuilding.width + 4
+          : 0;
+        const minWidth = 85;
+        const maxWidth = 145;
+        const width = minWidth + Math.random() * (maxWidth - minWidth);
+        const height =
+          index <= 1 || index >= 6
+            ? 45 + Math.random() * 70
+            : 90 + Math.random() * 160;
+        const lightsOn = [];
+        for (let i = 0; i < 50; i++) {
+          lightsOn.push(Math.random() < 0.28);
+        }
+        return { x, width, height, lightsOn };
+      },
+      colors: {
+        light: {
+          sky: ['#B7E4C7', '#F7FFF7'],
+          buildings: '#1B4332',
+          windows: '#95D5B2'
+        },
+        dark: {
+          sky: ['#081C15', '#2D6A4F'],
+          buildings: '#04110C',
+          windows: '#52B788'
+        }
+      }
+    },
+    {
+      id: 'arctic',
+      name: 'Arctic',
+      generateBuilding: function(index, previousBuilding) {
+        const x = previousBuilding
+          ? previousBuilding.x + previousBuilding.width + 4
+          : 0;
+        const minWidth = 70;
+        const maxWidth = 120;
+        const width = minWidth + Math.random() * (maxWidth - minWidth);
+        const height =
+          index <= 1 || index >= 6
+            ? 40 + Math.random() * 80
+            : 110 + Math.random() * 150;
+        const lightsOn = [];
+        for (let i = 0; i < 50; i++) {
+          lightsOn.push(Math.random() < 0.2);
+        }
+        return { x, width, height, lightsOn };
+      },
+      colors: {
+        light: {
+          sky: ['#B3E5FC', '#F1FAFF'],
+          buildings: '#90A4AE',
+          windows: '#E1F5FE'
+        },
+        dark: {
+          sky: ['#06263D', '#1E88A8'],
+          buildings: '#12314A',
+          windows: '#81D4FA'
+        }
+      }
+    },
+    {
+      id: 'volcano',
+      name: 'Volcano',
+      generateBuilding: function(index, previousBuilding) {
+        const x = previousBuilding
+          ? previousBuilding.x + previousBuilding.width + 4
+          : 0;
+        const minWidth = 75;
+        const maxWidth = 130;
+        const width = minWidth + Math.random() * (maxWidth - minWidth);
+        const height =
+          index <= 1 || index >= 6
+            ? 50 + Math.random() * 70
+            : 130 + Math.random() * 170;
+        const lightsOn = [];
+        for (let i = 0; i < 50; i++) {
+          lightsOn.push(Math.random() < 0.4);
+        }
+        return { x, width, height, lightsOn };
+      },
+      colors: {
+        light: {
+          sky: ['#FF8A65', '#FFD180'],
+          buildings: '#3E2723',
+          windows: '#FF7043'
+        },
+        dark: {
+          sky: ['#1A0000', '#B71C1C'],
+          buildings: '#140A0A',
+          windows: '#FFAB40'
         }
       }
     }
@@ -961,7 +1412,7 @@ const gameOptions = {
     },
     {
       id: 'rocket',
-      name: 'Rocket',
+      name: 'Comet',
       draw: function(ctx, rotation) {
         ctx.save();
         ctx.rotate(rotation);

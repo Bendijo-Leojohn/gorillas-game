@@ -631,3 +631,332 @@ button:hover {
   25% { transform: translateX(-5px); }
   75% { transform: translateX(5px); }
 }
+
+/* ------------------------------------------------------------------
+   v2 UI additions: scoreboard, sound toggle, control hint, readability
+   ------------------------------------------------------------------ */
+
+html,
+body {
+  overscroll-behavior: none;
+}
+
+canvas,
+#bomb-grab-area {
+  touch-action: none;
+}
+
+/* Scoreboard */
+#scoreboard {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background-color: rgba(15, 22, 38, 0.45);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  z-index: 30;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+#scoreboard .score-side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#scoreboard .score-name {
+  opacity: 0.85;
+  font-size: 0.85em;
+  text-transform: uppercase;
+}
+
+#scoreboard .score-value {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #ffe082;
+  min-width: 1ch;
+  text-align: center;
+}
+
+#scoreboard .score-separator {
+  opacity: 0.5;
+  font-size: 1.2em;
+}
+
+#score-reset {
+  pointer-events: auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 1em;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s, transform 0.2s, background-color 0.2s;
+}
+
+#score-reset:hover {
+  opacity: 1;
+  transform: rotate(-90deg);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Sound toggle */
+#sound-toggle.muted {
+  opacity: 0.6;
+}
+
+/* Keyboard hint under the instructions */
+.control-hint {
+  margin: 8px 0 0;
+  font-size: 0.85em;
+  opacity: 0.85;
+  letter-spacing: 0.02em;
+}
+
+.control-hint strong {
+  color: #ffe082;
+  font-weight: bold;
+}
+
+/* Slightly stronger contrast for the centered overlay text */
+#instructions {
+  text-align: center;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
+}
+
+/* Readability cards for the HUD */
+#info-left,
+#info-right {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background-color: rgba(15, 22, 38, 0.35);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+#wind-info {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background-color: rgba(15, 22, 38, 0.35);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+#settings {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background-color: rgba(15, 22, 38, 0.3);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+/* Winner overlay: round score */
+.final-score {
+  font-size: 1.1em;
+  font-weight: bold;
+  margin: 6px 0 12px;
+}
+
+/* Mobile layout tweaks */
+@media (max-width: 768px) {
+  #scoreboard {
+    top: 6px;
+    padding: 4px 10px;
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  #scoreboard .score-value {
+    font-size: 1.3em;
+  }
+
+  #info-left,
+  #info-right {
+    padding: 6px 10px;
+    border-radius: 10px;
+  }
+
+  /* Keep the top bar free for the HUD: scoreboard moves to the bottom */
+  #scoreboard {
+    top: auto;
+    bottom: 8px;
+  }
+
+  .control-hint {
+    font-size: 0.8em;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Special skills bar + nuke flash
+   ------------------------------------------------------------------ */
+
+#skills-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background-color: rgba(15, 22, 38, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  z-index: 30;
+  transition: opacity 0.25s, filter 0.25s;
+}
+
+#skills-bar.disabled {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+#skills-bar .skills-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-right: 2px;
+}
+
+.skill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.08);
+  color: white;
+  font-size: 12px;
+  line-height: 1;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.skill-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.skill-btn .skill-icon {
+  font-size: 14px;
+}
+
+.skill-btn .skill-count {
+  font-weight: bold;
+  color: #ffe082;
+}
+
+.skill-btn.active {
+  background-color: #e53935;
+  border-color: #ff8a80;
+  box-shadow: 0 0 14px rgba(229, 57, 53, 0.65);
+}
+
+.skill-btn.active .skill-count {
+  color: white;
+}
+
+.skill-btn.empty,
+.skill-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+#screen-flash {
+  position: fixed;
+  inset: 0;
+  background-color: white;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+#screen-flash.active {
+  animation: nuke-flash 0.45s ease-out;
+}
+
+@keyframes nuke-flash {
+  0% { opacity: 0.85; }
+  40% { opacity: 0.35; }
+  100% { opacity: 0; }
+}
+
+.special-hint {
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  #skills-bar {
+    bottom: 42px;
+    gap: 6px;
+    padding: 4px 8px;
+  }
+
+  #skills-bar .skills-label {
+    display: none;
+  }
+
+  .skill-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+/* Build tag so it is obvious which version the browser has loaded */
+.version-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.14);
+  font-size: 11px;
+  font-weight: normal;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+
+/* Shield skill state */
+.skill-btn.active-shield {
+  background-color: rgba(79, 195, 247, 0.25);
+  border-color: #81D4FA;
+  box-shadow: 0 0 14px rgba(79, 195, 247, 0.5);
+}
+
+.skill-btn.active-shield .skill-count {
+  color: #B3E5FC;
+}
+
+/* Shield timer in the HUD cards */
+.shield-time {
+  color: #81D4FA;
+  font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  #skills-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 92vw;
+  }
+
+  .skill-btn .skill-name {
+    display: none;
+  }
+
+  .skill-btn .skill-icon {
+    font-size: 15px;
+  }
+}

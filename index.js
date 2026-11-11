@@ -18,9 +18,19 @@ let dragStartY = undefined;
 let previousAnimationTimestamp = undefined;
 let animationFrameRequestID = undefined;
 let delayTimeoutID = undefined;
+let effectAnimationID = undefined;
 
 let simulationMode = false;
 let simulationImpact = {};
+
+// Remember each player's last keyboard aim, so arrow keys keep their settings
+const lastAim = [
+  { angle: 45, speed: 90 },
+  { angle: 45, speed: 90 },
+];
+
+// Terrain the current buildings were generated with (set again in newGame)
+let builtTerrain = "city";
 
 const darkModeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -36,9 +46,108 @@ const settings = {
   player2Character: 'robot',    // Player 2's character
 };
 
+// ------------------------------------------------------------
+// Special skills
+// ------------------------------------------------------------
+// How long an activated shield protects a player
+const SHIELD_DURATION_MS = 10000;
+
+const SKILLS = {
+  nuke: {
+    name: "Nuke",
+    damage: 100,        // instant knockout
+    explosionSize: 135,
+    shake: 26,
+    blastRadius: 65,
+    blastHoles: 12,
+    color: "#FFD54F",
+  },
+  rocket: {
+    name: "Missile",
+    damage: 45,
+    explosionSize: 55,
+    shake: 16,
+    blastRadius: 28,
+    blastHoles: 4,
+    color: "#FF7043",
+  },
+  shield: {
+    name: "Shield",
+    color: "#4FC3F7",
+    durationMs: SHIELD_DURATION_MS,
+  },
+};
+
+const STARTING_SKILLS = { nuke: 1, rocket: 2, shield: 2 };
+
+// Castle layout: two castles at the edges of a wide battlefield
+const CASTLE = {
+  width: 280,
+  margin: 60,
+  worldWidth: 1500,
+};
+
 // Initialize character image
 const characterImage = new Image();
 characterImage.src = "character.png";
+
+// ------------------------------------------------------------
+// Preferences (remember character / terrain / ball / effect)
+// ------------------------------------------------------------
+const PREFERENCES_STORAGE_KEY = "gorillas-options-v1";
+const PERSISTED_SETTINGS = [
+  "terrain",
+  "ball",
+  "effect",
+  "player1Character",
+  "player2Character",
+  "mode",
+];
+
+function loadPreferences() {
+  let stored;
+  try {
+    stored = JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY));
+  } catch (error) {
+    return;
+  }
+  if (!stored || typeof stored !== "object") return;
+
+  PERSISTED_SETTINGS.forEach((key) => {
+    if (typeof stored[key] === "string") settings[key] = stored[key];
+  });
+
+  // Guard against options that no longer exist
+  if (!gameOptions.terrains.some((terrain) => terrain.id === settings.terrain)) {
+    settings.terrain = "city";
+  }
+  if (!gameOptions.balls.some((ball) => ball.id === settings.ball)) {
+    settings.ball = "banana";
+  }
+  if (!gameOptions.effects.some((effect) => effect.id === settings.effect)) {
+    settings.effect = "explosion";
+  }
+  ["player1Character", "player2Character"].forEach((key) => {
+    if (!gameOptions.characters.some((character) => character.id === settings[key])) {
+      settings[key] = "default";
+    }
+  });
+  if (!["light", "dark"].includes(settings.mode)) {
+    settings.mode = darkModeMediaQuery.matches ? "dark" : "light";
+  }
+}
+
+function savePreferences() {
+  try {
+    const snapshot = {};
+    PERSISTED_SETTINGS.forEach((key) => {
+      snapshot[key] = settings[key];
+    });
+    localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch (error) {
+    /* ignore */
+  }
+}
 
 // Device detection
 const isMobile = {
@@ -56,42 +165,52 @@ const isMobile = {
   }
 };
 
-// Apply mobile-specific optimizations if on a mobile device
-function applyMobileOptimizations() {
-  if (isMobile.any() || window.innerWidth < 768) {
-    // Enlarge the bomb grab area for easier touch
-    bombGrabAreaDOM.style.width = '45px';
-    bombGrabAreaDOM.style.height = '45px';
-    
-    // Make the windmill smaller on mobile
-    const windmill = document.getElementById('windmill');
-    windmill.style.width = '100px';
-    windmill.style.height = '120px';
-    
-    // Adjust game UI elements for mobile
-    document.getElementById('settings').classList.add('mobile-settings');
-    document.getElementById('wind-info').classList.add('mobile-wind-info');
-    
-    // Adjust info panels
-    const infoLeft = document.getElementById('info-left');
-    const infoRight = document.getElementById('info-right');
-    infoLeft.classList.add('mobile-info');
-    infoRight.classList.add('mobile-info');
-    
-    // Make instructions more visible on mobile
-    const instructions = document.getElementById('instructions');
-    instructions.classList.add('mobile-instructions');
-    
-    // Make sure player info is always visible
-    infoLeft.style.opacity = '1';
-    infoRight.style.opacity = '1';
-    
-    // Add touch-friendly class to the game
-    document.body.classList.add('touch-friendly');
-  }
+// Apply mobile-specific optimizations if on a mobile device.
+// NOTE: this is only called after the DOM references below exist.
+function isTouchDevice() {
+  return isMobile.any() || window.innerWidth < 768;
 }
 
-applyMobileOptimizations();
+function applyMobileOptimizations() {
+  if (!bombGrabAreaDOM) return;
+  if (!isTouchDevice()) return;
+
+  // Enlarge the bomb grab area for easier touch
+  bombGrabAreaDOM.style.width = '45px';
+  bombGrabAreaDOM.style.height = '45px';
+
+  // Make the windmill smaller on mobile
+  const windmill = document.getElementById('windmill');
+  if (windmill) {
+    windmill.style.width = '100px';
+    windmill.style.height = '120px';
+  }
+
+  // Adjust game UI elements for mobile
+  const settingsEl = document.getElementById('settings');
+  if (settingsEl) settingsEl.classList.add('mobile-settings');
+  const windInfoEl = document.getElementById('wind-info');
+  if (windInfoEl) windInfoEl.classList.add('mobile-wind-info');
+
+  // Adjust info panels
+  const infoLeft = document.getElementById('info-left');
+  const infoRight = document.getElementById('info-right');
+  if (infoLeft) {
+    infoLeft.classList.add('mobile-info');
+    infoLeft.style.opacity = '1';
+  }
+  if (infoRight) {
+    infoRight.classList.add('mobile-info');
+    infoRight.style.opacity = '1';
+  }
+
+  // Make instructions more visible on mobile
+  const instructions = document.getElementById('instructions');
+  if (instructions) instructions.classList.add('mobile-instructions');
+
+  // Add touch-friendly class to the game
+  document.body.classList.add('touch-friendly');
+}
 
 const blastHoleRadius = 18;
 
@@ -151,6 +270,32 @@ const ballOptionsContainer = document.getElementById("ball-options");
 const effectOptionsContainer = document.getElementById("effect-options");
 const optionsDoneButton = document.getElementById("options-done");
 
+// Scoreboard elements
+const scoreLeftNameDOM = document.getElementById("score-left-name");
+const scoreRightNameDOM = document.getElementById("score-right-name");
+const scoreLeftDOM = document.getElementById("score-left");
+const scoreRightDOM = document.getElementById("score-right");
+const scoreResetDOM = document.getElementById("score-reset");
+const finalScoreDOM = document.getElementById("final-score");
+
+// Sound toggle
+const soundToggleDOM = document.getElementById("sound-toggle");
+
+// Shield countdown in the info panels
+const shield1DOM = document.querySelector("#info-left .shield-time");
+const shield2DOM = document.querySelector("#info-right .shield-time");
+
+// Special skills
+const skillsBarDOM = document.getElementById("skills-bar");
+const skillButtonsDOM = document.querySelectorAll(".skill-btn");
+const screenFlashDOM = document.getElementById("screen-flash");
+
+// All UI elements exist at this point - safe to apply mobile tweaks
+applyMobileOptimizations();
+
+// Restore the player's last choices before building the options panel
+loadPreferences();
+
 // Create Options Button
 const optionsButton = document.createElement("button");
 optionsButton.innerText = "Game Options";
@@ -167,31 +312,328 @@ optionsButton.addEventListener("click", () => {
 
 optionsDoneButton.addEventListener("click", () => {
   gameOptionsPanel.style.display = "none";
-  // Apply the changes and redraw
-  updateBuildingsForTerrain();
+  savePreferences();
+  SoundEngine.playClick();
+
+  // Only rebuild the city when the terrain actually changed
+  if (settings.terrain !== builtTerrain) {
+    updateBuildingsForTerrain();
+  }
+
   draw();
 });
 
 colorModeButtonDOM.addEventListener("click", () => {
-  if (settings.mode === "dark") {
-    settings.mode = "light";
-    colorModeButtonDOM.innerText = "Dark Mode";
-  } else {
-    settings.mode = "dark";
-    colorModeButtonDOM.innerText = "Light Mode";
-  }
+  settings.mode = settings.mode === "dark" ? "light" : "dark";
+  SoundEngine.playClick();
+  applyColorMode();
   draw();
 });
 
 darkModeMediaQuery.addEventListener("change", (e) => {
   settings.mode = e.matches ? "dark" : "light";
-  if (settings.mode === "dark") {
-    colorModeButtonDOM.innerText = "Light Mode";
-  } else {
-    colorModeButtonDOM.innerText = "Dark Mode";
-  }
+  applyColorMode();
   draw();
 });
+
+// Keep the page styling in sync with the canvas color mode
+function applyColorMode() {
+  const isDark = settings.mode === "dark";
+  document.body.classList.toggle("dark-mode", isDark);
+  document.body.classList.toggle("light-mode", !isDark);
+  colorModeButtonDOM.textContent = isDark ? "Light Mode" : "Dark Mode";
+}
+
+// ------------------------------------------------------------
+// Scores (persisted in localStorage, one scoreboard per mode)
+// ------------------------------------------------------------
+const SCORES_STORAGE_KEY = "gorillas-scores-v1";
+const SCORE_NAMES = {
+  single: ["You", "Computer"],
+  two: ["Player 1", "Player 2"],
+  auto: ["Computer 1", "Computer 2"],
+};
+
+function emptyScores() {
+  return { single: [0, 0], two: [0, 0], auto: [0, 0] };
+}
+
+function loadScores() {
+  const fallback = emptyScores();
+  try {
+    const stored = JSON.parse(localStorage.getItem(SCORES_STORAGE_KEY));
+    if (!stored || typeof stored !== "object") return fallback;
+    Object.keys(fallback).forEach((key) => {
+      if (
+        Array.isArray(stored[key]) &&
+        stored[key].length === 2 &&
+        stored[key].every((value) => Number.isFinite(value))
+      ) {
+        fallback[key] = stored[key].map((value) => Math.max(0, Math.floor(value)));
+      }
+    });
+  } catch (error) {
+    /* corrupted or blocked storage - start fresh */
+  }
+  return fallback;
+}
+
+let scores = loadScores();
+
+function saveScores() {
+  try {
+    localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(scores));
+  } catch (error) {
+    /* ignore */
+  }
+}
+
+function currentScoreKey() {
+  if (settings.numberOfPlayers === 0) return "auto";
+  if (settings.numberOfPlayers === 2) return "two";
+  return "single";
+}
+
+function renderScores() {
+  const key = currentScoreKey();
+  const names = SCORE_NAMES[key];
+  const values = scores[key];
+
+  if (scoreLeftNameDOM) scoreLeftNameDOM.textContent = names[0];
+  if (scoreRightNameDOM) scoreRightNameDOM.textContent = names[1];
+  if (scoreLeftDOM) scoreLeftDOM.textContent = values[0];
+  if (scoreRightDOM) scoreRightDOM.textContent = values[1];
+  if (finalScoreDOM) finalScoreDOM.textContent = `${values[0]} : ${values[1]}`;
+}
+
+function recordWin(player) {
+  const key = currentScoreKey();
+  if (!scores[key]) scores[key] = [0, 0];
+  scores[key][player - 1] += 1;
+  saveScores();
+  renderScores();
+}
+
+function resetScores() {
+  scores = emptyScores();
+  saveScores();
+  renderScores();
+}
+
+if (scoreResetDOM) {
+  scoreResetDOM.addEventListener("click", () => {
+    SoundEngine.playClick();
+    resetScores();
+  });
+}
+
+// ------------------------------------------------------------
+// Sound
+// ------------------------------------------------------------
+if (soundToggleDOM) {
+  SoundEngine.onChange((enabled) => {
+    soundToggleDOM.textContent = enabled ? "Sound On" : "Muted";
+    soundToggleDOM.classList.toggle("muted", !enabled);
+    soundToggleDOM.setAttribute("aria-pressed", String(enabled));
+  });
+
+  soundToggleDOM.addEventListener("click", () => {
+    SoundEngine.unlock();
+    SoundEngine.toggleMute();
+  });
+}
+
+// Browsers only allow audio after a user gesture
+function unlockAudio() {
+  SoundEngine.unlock();
+  window.removeEventListener("pointerdown", unlockAudio);
+  window.removeEventListener("keydown", unlockAudio);
+  window.removeEventListener("touchstart", unlockAudio);
+}
+
+window.addEventListener("pointerdown", unlockAudio);
+window.addEventListener("keydown", unlockAudio);
+window.addEventListener("touchstart", unlockAudio, { passive: true });
+
+// ------------------------------------------------------------
+// Special skills: HUD, selection and helpers
+// ------------------------------------------------------------
+function skillPoolForCurrentPlayer() {
+  if (!state.skills) return null;
+  return state.skills[state.currentPlayer - 1] || null;
+}
+
+function renderSkills() {
+  const pool = skillPoolForCurrentPlayer() || { nuke: 0, rocket: 0, shield: 0 };
+
+  skillButtonsDOM.forEach((button) => {
+    const id = button.dataset.skill;
+    const count = pool[id] || 0;
+    const countDOM = button.querySelector(".skill-count");
+    const shieldActive = id === "shield" && isShieldActive(state.currentPlayer);
+
+    let label = `×${count}`;
+    if (shieldActive) label = `${shieldRemainingSeconds(state.currentPlayer)}s`;
+    if (countDOM) countDOM.textContent = label;
+
+    button.classList.toggle("active", id !== "shield" && state.activeSkill === id);
+    button.classList.toggle("active-shield", shieldActive);
+    button.classList.toggle("empty", count <= 0);
+    button.disabled = shieldActive || count <= 0;
+    button.setAttribute("aria-pressed", String(state.activeSkill === id || shieldActive));
+  });
+
+  updateShieldHUD();
+
+  if (skillsBarDOM) {
+    const humanTurn =
+      state.phase === "aiming" &&
+      settings.numberOfPlayers !== 0 &&
+      !(settings.numberOfPlayers === 1 && state.currentPlayer === 2);
+    skillsBarDOM.classList.toggle("disabled", !humanTurn);
+  }
+}
+
+function selectSkill(id) {
+  if (!isHumanTurn()) return;
+
+  const pool = skillPoolForCurrentPlayer();
+  if (!pool || !(pool[id] > 0)) return;
+
+  // The shield is used immediately, not attached to the next throw
+  if (id === "shield") {
+    if (isShieldActive(state.currentPlayer)) return;
+    pool.shield -= 1;
+    activateShield(state.currentPlayer);
+    SoundEngine.playShield();
+    renderSkills();
+    draw();
+    return;
+  }
+
+  state.activeSkill = state.activeSkill === id ? null : id;
+  SoundEngine.playClick();
+  renderSkills();
+  draw();
+}
+
+// Push a few extra craters around an impact so big hits destroy more terrain
+function addBlastScars(x, y, radius, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+    const distance = radius * (0.25 + Math.random() * 0.75);
+    state.blastHoles.push({
+      x: x + Math.cos(angle) * distance,
+      y: y + Math.sin(angle) * distance,
+    });
+  }
+}
+
+function triggerFlash() {
+  if (!screenFlashDOM) return;
+  screenFlashDOM.classList.remove("active");
+  // Force a reflow so the animation can restart
+  void screenFlashDOM.offsetWidth;
+  screenFlashDOM.classList.add("active");
+  setTimeout(() => screenFlashDOM.classList.remove("active"), 520);
+}
+
+// What should the computer use on this turn?
+function chooseComputerSkill() {
+  const pool = skillPoolForCurrentPlayer();
+  if (!pool) return null;
+
+  const enemyIndex = state.currentPlayer === 1 ? 1 : 0;
+  const enemyHealth = state.players[enemyIndex].health;
+
+  if (pool.nuke > 0 && enemyHealth <= 45 && state.round >= 2) return "nuke";
+  if (pool.rocket > 0 && (enemyHealth <= 70 || state.round >= 3)) return "rocket";
+
+  return null;
+}
+
+// ------------------------------------------------------------
+// Timed shields
+// ------------------------------------------------------------
+let shieldTickerId = null;
+
+function isShieldActive(player) {
+  const shield = state.shields && state.shields[player - 1];
+  return Boolean(shield && shield.expiresAt > Date.now());
+}
+
+function shieldRemainingSeconds(player) {
+  const shield = state.shields && state.shields[player - 1];
+  if (!shield) return 0;
+  return Math.max(0, Math.ceil((shield.expiresAt - Date.now()) / 1000));
+}
+
+function activateShield(player) {
+  if (!state.shields) return;
+  state.shields[player - 1].expiresAt = Date.now() + SHIELD_DURATION_MS;
+  startShieldTicker();
+}
+
+function breakShield(player) {
+  if (!state.shields) return;
+  state.shields[player - 1].expiresAt = 0;
+}
+
+function updateShieldHUD() {
+  const text1 = isShieldActive(1) ? `${shieldRemainingSeconds(1)}s` : "—";
+  const text2 = isShieldActive(2) ? `${shieldRemainingSeconds(2)}s` : "—";
+  if (shield1DOM) shield1DOM.textContent = text1;
+  if (shield2DOM) shield2DOM.textContent = text2;
+}
+
+function startShieldTicker() {
+  updateShieldHUD();
+  if (shieldTickerId) return;
+
+  shieldTickerId = setInterval(() => {
+    const anyActive = isShieldActive(1) || isShieldActive(2);
+    renderSkills();
+
+    if (state.phase !== "in flight") draw();
+
+    if (!anyActive) {
+      clearInterval(shieldTickerId);
+      shieldTickerId = null;
+    }
+  }, 120);
+}
+
+function triggerShieldRipple(x, y) {
+  state.shieldRipples = state.shieldRipples || [];
+  state.shieldRipples.push({ x, y, life: 1 });
+}
+
+// The computer raises a shield when it is hurt or facing a charged nuke
+function computerMaybeShield() {
+  const pool = skillPoolForCurrentPlayer();
+  if (!pool || pool.shield <= 0) return;
+  if (isShieldActive(state.currentPlayer)) return;
+
+  const enemyIndex = state.currentPlayer === 1 ? 1 : 0;
+  const myHealth = state.players[state.currentPlayer - 1].health;
+  const enemyNukeReady = state.skills[enemyIndex].nuke > 0;
+  const threatened = enemyNukeReady && state.players[enemyIndex].health <= 60;
+
+  if ((myHealth <= 50 || threatened) && Math.random() < 0.7) {
+    pool.shield -= 1;
+    activateShield(state.currentPlayer);
+    SoundEngine.playShield();
+    renderSkills();
+    draw();
+  }
+}
+
+skillButtonsDOM.forEach((button) => {
+  button.addEventListener("click", () => selectSkill(button.dataset.skill));
+});
+
+renderScores();
+applyColorMode();
 
 newGame();
 
@@ -203,11 +645,23 @@ function newGame() {
     round: 1,
     windSpeed: generateWindSpeed(),
     lastHitPoint: null, // Track exact hit location for effect placement
+    shake: 0, // Screen shake strength after an impact
+    winnerAnnounced: false, // Make sure a win is only counted once
+
+    // Special skills (one pool per player)
+    skills: [
+      { ...STARTING_SKILLS },
+      { ...STARTING_SKILLS },
+    ],
+    activeSkill: null, // Skill picked in the HUD, used on the next throw
+    throwSkill: null,  // Skill attached to the bomb currently in flight
+    pendingSkill: null, // Skill chosen by the computer for its next throw
     bomb: {
       x: undefined,
       y: undefined,
       rotation: 0,
       velocity: { x: 0, y: 0 },
+      trail: [], // smoke trail for the missile
       highlight: true,
     },
 
@@ -227,10 +681,16 @@ function newGame() {
       }
     ],
 
-    // Buildings
+    // Buildings (destructible castle blocks) and each player's home keep
     backgroundBuildings: [],
     buildings: [],
+    homes: [],
+    worldWidth: 1500,
     blastHoles: [],
+
+    // Timed shields (epoch ms when they expire, 0 = inactive)
+    shields: [{ expiresAt: 0 }, { expiresAt: 0 }],
+    shieldRipples: [],
 
     stars: [],
     birds: [], // Add birds to state
@@ -245,22 +705,6 @@ function newGame() {
     const y = Math.floor(Math.random() * window.innerHeight);
     state.stars.push({ x, y });
   }
-
-  // Add a day/night toggle button to the DOM
-  window.addEventListener('DOMContentLoaded', () => {
-    let toggleBtn = document.createElement('button');
-    toggleBtn.id = 'toggle-day-night';
-    toggleBtn.textContent = 'Toggle Day/Night';
-    toggleBtn.style.position = 'fixed';
-    toggleBtn.style.top = '10px';
-    toggleBtn.style.right = '10px';
-    toggleBtn.style.zIndex = 1000;
-    document.body.appendChild(toggleBtn);
-    toggleBtn.addEventListener('click', () => {
-      settings.mode = settings.mode === 'dark' ? 'light' : 'dark';
-      newGame();
-    });
-  });
 
   // Add birds and twinkling stars to state
   if (settings.mode === 'light') {
@@ -282,10 +726,9 @@ function newGame() {
     generateBackgroundBuilding(i);
   }
 
-  // Generate buildings
-  for (let i = 0; i < 8; i++) {
-    generateBuilding(i);
-  }
+  // Each player gets their own castle, far away from the opponent
+  generateCastleWorld();
+  builtTerrain = settings.terrain;
 
   calculateScaleAndShift();
   initializeBombPosition();
@@ -294,6 +737,8 @@ function newGame() {
 
   // Cancel any ongoing animation and timeout
   cancelAnimationFrame(animationFrameRequestID);
+  cancelAnimationFrame(effectAnimationID);
+  effectAnimationID = undefined;
   clearTimeout(delayTimeoutID);
 
   // Reset HTML elements
@@ -316,6 +761,12 @@ function newGame() {
   simulationMode = false;
   simulationImpact = {};
 
+  // Reset the remembered keyboard aim for both players
+  lastAim[0] = { angle: 45, speed: 90 };
+  lastAim[1] = { angle: 45, speed: 90 };
+
+  renderSkills();
+
   draw();
 
   if (settings.numberOfPlayers === 0) {
@@ -324,7 +775,6 @@ function newGame() {
 }
 
 function showInstructions() {
-  singlePlayerButtonDOM.checked = true;
   instructionsDOM.style.opacity = 1;
   instructionsDOM.style.visibility = "visible";
 }
@@ -401,31 +851,76 @@ function generateBuilding(index) {
   state.buildings.push({ x, width, height, lightsOn });
 }
 
-// Function to update buildings based on selected terrain
-function updateBuildingsForTerrain() {
-  // Find the selected terrain
-  const selectedTerrain = gameOptions.terrains.find(terrain => terrain.id === settings.terrain);
-  
-  if (!selectedTerrain) return; // Safety check
-  
-  // Clear existing buildings
-  state.buildings = [];
-  state.blastHoles = [];
-  
-  // Generate new buildings using the selected terrain's generator
-  for (let i = 0; i < 8; i++) {
-    const previousBuilding = state.buildings[i - 1];
-    const building = selectedTerrain.generateBuilding(i, previousBuilding);
-    state.buildings.push(building);
+// ------------------------------------------------------------
+// Castles: each player owns a destructible castle, far apart
+// ------------------------------------------------------------
+function makeCastleBlock(x, width, height, side, extra = {}) {
+  const lightsOn = [];
+  for (let i = 0; i < 50; i++) {
+    lightsOn.push(Math.random() < 0.45);
   }
-  
-  // Recalculate scale and shift for the new buildings
-  calculateScaleAndShift();
+  return {
+    x,
+    width,
+    height,
+    lightsOn,
+    isCastle: true,
+    castleSide: side,
+    ...extra,
+  };
+}
+
+// A castle is made of curtain walls, a tall keep and crenellations.
+// Every block is in state.buildings, so any of them can be blown apart.
+function buildCastle(baseX, side) {
+  const random = (min, max) => min + Math.random() * (max - min);
+  const wallLeftHeight = random(90, 122);
+  const keepHeight = random(178, 218);
+  const wallRightHeight = random(82, 112);
+
+  const blocks = [];
+  blocks.push(makeCastleBlock(baseX, 74, wallLeftHeight, side));
+  blocks.push(makeCastleBlock(baseX + 84, 112, keepHeight, side));
+  blocks.push(makeCastleBlock(baseX + 206, 74, wallRightHeight, side));
+
+  for (let i = 0; i < 3; i++) {
+    blocks.push(
+      makeCastleBlock(baseX + 5 + i * 24, 16, wallLeftHeight + 16, side, {
+        crenellation: true,
+      })
+    );
+    blocks.push(
+      makeCastleBlock(baseX + 211 + i * 24, 16, wallRightHeight + 16, side, {
+        crenellation: true,
+      })
+    );
+  }
+
+  return { blocks, home: blocks[1] };
+}
+
+function generateCastleWorld() {
+  state.buildings = [];
+  state.homes = [];
+  state.blastHoles = [];
+  state.worldWidth = CASTLE.worldWidth;
+
+  const bases = [
+    CASTLE.margin,
+    CASTLE.worldWidth - CASTLE.margin - CASTLE.width,
+  ];
+
+  bases.forEach((baseX, index) => {
+    const castle = buildCastle(baseX, index + 1);
+    castle.blocks.forEach((block) => state.buildings.push(block));
+    state.homes.push(castle.home);
+  });
 }
 
 function calculateScaleAndShift() {
   const lastBuilding = state.buildings.at(-1);
-  const totalWidthOfTheCity = lastBuilding.x + lastBuilding.width;
+  const totalWidthOfTheCity =
+    state.worldWidth || lastBuilding.x + lastBuilding.width;
 
   const horizontalScale = window.innerWidth / totalWidthOfTheCity ?? 1;
   const verticalScale = window.innerHeight / 500;
@@ -464,39 +959,12 @@ function handleResize() {
   initializeBombPosition();
   initializeWindmillPosition();
   
-  // Reposition UI elements if needed
-  updateUIPositions();
-  
   // Redraw the game
   draw();
 }
 
-// Function to update UI positions based on current screen size
-function updateUIPositions() {
-  // Adjust the bomb grab area position
-  const building = state.currentPlayer === 1 
-    ? state.buildings.at(1) 
-    : state.buildings.at(-2);
-  
-  if (building) {
-    const buildingCenterX = building.x + building.width / 2;
-    const buildingTop = building.height;
-    
-    // Position the bomb grab area
-    const rect = canvas.getBoundingClientRect();
-    const grabAreaX = (buildingCenterX / canvas.width) * rect.width;
-    const grabAreaY = (buildingTop / canvas.height) * rect.height;
-    
-    bombGrabAreaDOM.style.left = `${grabAreaX - 22.5}px`;
-    bombGrabAreaDOM.style.top = `${grabAreaY - 75}px`;
-  }
-}
-
 function initializeBombPosition() {
-  const building =
-    state.currentPlayer === 1
-      ? state.buildings.at(1) // Second building
-      : state.buildings.at(-2); // Second last building
+  const building = state.homes[state.currentPlayer - 1] || state.homes[0];
 
   const gorillaX = building.x + building.width / 2;
   const gorillaY = building.height;
@@ -509,6 +977,7 @@ function initializeBombPosition() {
   state.bomb.velocity.x = 0;
   state.bomb.velocity.y = 0;
   state.bomb.rotation = 0;
+  state.bomb.trail = [];
 
   // Initialize the position of the grab area in HTML
   const grabAreaRadius = 15;
@@ -520,8 +989,14 @@ function initializeBombPosition() {
 }
 
 function initializeWindmillPosition() {
-  // Move windmill into position
-  const lastBuilding = state.buildings.at(-1);
+  // Put the windmill on top of the rightmost castle wall
+  const walls = state.buildings.filter((block) => !block.crenellation);
+  const lastBuilding = walls.reduce(
+    (rightmost, block) =>
+      !rightmost || block.x > rightmost.x ? block : rightmost,
+    null
+  );
+  if (!lastBuilding) return;
   let rooftopY = lastBuilding.height * state.scale;
   let rooftopX =
     (lastBuilding.x + lastBuilding.width / 2) * state.scale + state.shift;
@@ -535,12 +1010,24 @@ function initializeWindmillPosition() {
   windInfoDOM.style.left = `${rooftopX - 50}px`;
 }
 
-function draw() {
+function draw(overlay) {
   ctx.save();
 
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
   drawBackgroundSky();
+
+  // Screen shake after an impact (decays every frame)
+  let shakeX = 0;
+  let shakeY = 0;
+  if (state.shake > 0.4) {
+    shakeX = (Math.random() - 0.5) * state.shake;
+    shakeY = (Math.random() - 0.5) * state.shake;
+    state.shake *= 0.82;
+    ctx.translate(shakeX, shakeY);
+  } else {
+    state.shake = 0;
+  }
 
   // Flip coordinate system upside down
   ctx.translate(0, window.innerHeight);
@@ -551,12 +1038,18 @@ function draw() {
   ctx.scale(state.scale, state.scale);
 
   // Draw scene
-  drawBackgroundMoon();
   drawBackgroundBuildings();
   drawBuildingsWithBlastHoles();
+  drawCastleFlags();
   drawGorilla(1);
   drawGorilla(2);
+  drawShields();
+  drawMissileTrail();
   drawBomb();
+  drawShieldRipples();
+
+  // Optional overlay (used for impact effects) - already in scene coordinates
+  if (typeof overlay === "function") overlay();
 
   // Restore transformation
   ctx.restore();
@@ -589,13 +1082,19 @@ function updateHealthDisplay(player, health) {
 // Draw background sky, sun/moon, birds, and twinkling stars
 function drawBackgroundSky() {
   const gradient = ctx.createLinearGradient(0, 0, 0, window.innerHeight);
-  if (settings.mode === "dark") {
-    gradient.addColorStop(1, "#27507F");
-    gradient.addColorStop(0, "#58A8D8");
-  } else {
-    gradient.addColorStop(1, "#F8BA85");
-    gradient.addColorStop(0, "#FFC28E");
-  }
+
+  // Use the selected terrain's sky colors (falls back to the classic sky)
+  const terrain = gameOptions.terrains.find(
+    (item) => item.id === settings.terrain
+  );
+  const skyColors = terrain && terrain.colors
+    ? terrain.colors[settings.mode].sky
+    : settings.mode === "dark"
+      ? ["#27507F", "#58A8D8"]
+      : ["#F8BA85", "#FFC28E"];
+
+  gradient.addColorStop(0, skyColors[1]);
+  gradient.addColorStop(1, skyColors[0]);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
@@ -657,31 +1156,68 @@ function drawBird(ctx, x, y, size, wing) {
   ctx.restore();
 }
 
-function drawBackgroundMoon() {
-  if (settings.mode === "dark") {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-    ctx.beginPath();
-    ctx.arc(
-      window.innerWidth / state.scale - state.shift - 200,
-      window.innerHeight / state.scale - 100,
-      30,
-      0,
-      2 * Math.PI
-    );
-    ctx.fill();
-  } else {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-    ctx.beginPath();
-    ctx.arc(300, 350, 60, 0, 2 * Math.PI);
-    ctx.fill();
+// Small colour helpers so castles stay readable on every terrain
+function hexToRgb(hex) {
+  const clean = hex.replace("#", "");
+  const value =
+    clean.length === 3
+      ? clean
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : clean;
+  return {
+    r: parseInt(value.slice(0, 2), 16) || 0,
+    g: parseInt(value.slice(2, 4), 16) || 0,
+    b: parseInt(value.slice(4, 6), 16) || 0,
+  };
+}
+
+function colorLuminance(hex) {
+  if (!hex || hex[0] !== "#") return 0.4;
+  const { r, g, b } = hexToRgb(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+function lightenColor(hex, amount) {
+  if (!hex || hex[0] !== "#") return hex;
+  const { r, g, b } = hexToRgb(hex);
+  const mix = (channel) =>
+    Math.round(channel + (255 - channel) * amount)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${mix(r)}${mix(g)}${mix(b)}`;
+}
+
+function getTerrainBuildingColor() {
+  const mode = settings.mode;
+  const terrain = gameOptions.terrains.find(
+    (option) => option.id === settings.terrain
+  );
+  const base = terrain
+    ? terrain.colors[mode].buildings
+    : mode === "dark"
+      ? "#152A47"
+      : "#4A3C68";
+
+  // Very dark castles would vanish into a dark sky, so lift them a little
+  if (mode === "dark" && colorLuminance(base) < 0.12) {
+    return lightenColor(base, 0.2);
   }
+  return base;
 }
 
 function drawBackgroundBuildings() {
+  const color = getTerrainBuildingColor();
+
+  // The skyline recedes into the haze so the castles read as foreground
+  ctx.save();
+  ctx.globalAlpha = settings.mode === "dark" ? 0.42 : 0.5;
+  ctx.fillStyle = color;
   state.backgroundBuildings.forEach((building) => {
-    ctx.fillStyle = settings.mode === "dark" ? "#254D7E" : "#947285";
     ctx.fillRect(building.x, 0, building.width, building.height);
   });
+  ctx.restore();
 }
 
 function drawBuildingsWithBlastHoles() {
@@ -706,18 +1242,103 @@ function drawBuildingsWithBlastHoles() {
 
   drawBuildings();
 
+  // Rubble around every crater
+  state.blastHoles.forEach((blastHole, index) => {
+    ctx.save();
+    ctx.fillStyle = settings.mode === "dark"
+      ? "rgba(30, 24, 40, 0.5)"
+      : "rgba(40, 32, 52, 0.45)";
+
+    for (let chunk = 0; chunk < 3; chunk++) {
+      const angle = index * 1.7 + chunk * 2.1;
+      const distance = blastHoleRadius + 6 + ((chunk * 7 + index * 3) % 14);
+      const size = 2 + ((chunk * 5 + index) % 3);
+      ctx.fillRect(
+        blastHole.x + Math.cos(angle) * distance,
+        blastHole.y + Math.sin(angle) * distance,
+        size,
+        size
+      );
+    }
+
+    // Highlight on the surviving lip of the hole
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(
+      blastHole.x,
+      blastHole.y,
+      blastHoleRadius + 1,
+      Math.PI * 0.9,
+      Math.PI * 1.75
+    );
+    ctx.stroke();
+    ctx.restore();
+  });
+
   ctx.restore();
 }
 
 function drawBuildings() {
   // Get the selected terrain's building color
-  const selectedTerrain = gameOptions.terrains.find(terrain => terrain.id === settings.terrain);
-  const mode = settings.mode;
-  const buildingColor = selectedTerrain ? selectedTerrain.colors[mode].buildings : (mode === "dark" ? "#152A47" : "#4A3C68");
+  const buildingColor = getTerrainBuildingColor();
+  const lightStone = colorLuminance(buildingColor) < 0.32;
   state.buildings.forEach((building) => {
     // Draw building
     ctx.fillStyle = buildingColor;
     ctx.fillRect(building.x, 0, building.width, building.height);
+
+    // Castle blocks get stone courses and arrow slits instead of windows
+    if (building.isCastle) {
+      ctx.save();
+
+      // Stone courses
+      ctx.strokeStyle =
+        settings.mode === "dark"
+          ? "rgba(255, 255, 255, 0.07)"
+          : "rgba(0, 0, 0, 0.10)";
+      ctx.lineWidth = 1;
+      for (let y = 14; y < building.height; y += 16) {
+        ctx.beginPath();
+        ctx.moveTo(building.x, y);
+        ctx.lineTo(building.x + building.width, y);
+        ctx.stroke();
+      }
+
+      if (!building.crenellation) {
+        // Arrow slits
+        const slitWidth = 6;
+        const slitHeight = 16;
+        const columns = Math.max(1, Math.floor(building.width / 36));
+        const rows = Math.max(1, Math.floor(building.height / 64));
+
+        ctx.fillStyle = lightStone
+          ? "rgba(190, 212, 235, 0.35)"
+          : "rgba(18, 14, 26, 0.55)";
+
+        for (let column = 0; column < columns; column++) {
+          for (let row = 0; row < rows; row++) {
+            const slitX =
+              building.x +
+              (building.width / (columns + 1)) * (column + 1) -
+              slitWidth / 2;
+            const slitY = 24 + row * 60;
+            if (slitY + slitHeight < building.height - 8) {
+              ctx.fillRect(slitX, slitY, slitWidth, slitHeight);
+            }
+          }
+        }
+
+        // Rim light + shadow cap keep the wall silhouette readable
+        ctx.fillStyle = "rgba(255, 255, 255, 0.16)";
+        ctx.fillRect(building.x, building.height - 5, building.width, 2);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+        ctx.fillRect(building.x, building.height - 3, building.width, 3);
+      }
+
+      ctx.restore();
+      return;
+    }
 
     // Draw windows
     const windowWidth = 10;
@@ -752,13 +1373,196 @@ function drawBuildings() {
   });
 }
 
+// Player flags on top of each castle
+function drawCastleFlags() {
+  if (!state.homes) return;
+
+  state.homes.forEach((home, index) => {
+    if (!home) return;
+
+    const offset = index === 0 ? 34 : -34;
+    const poleX = home.x + home.width / 2 + offset;
+    const baseY = home.height;
+    const poleHeight = 46;
+
+    ctx.save();
+
+    // Pole
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(poleX, baseY);
+    ctx.lineTo(poleX, baseY + poleHeight);
+    ctx.stroke();
+
+    // Flag
+    const color = index === 0 ? "#42A5F5" : "#EF5350";
+    const direction = index === 0 ? 1 : -1;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(poleX, baseY + poleHeight);
+    ctx.lineTo(poleX + 26 * direction, baseY + poleHeight - 9);
+    ctx.lineTo(poleX, baseY + poleHeight - 18);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  });
+}
+
+// Pulsing shield bubbles around protected players
+function drawShields() {
+  if (!state.shields) return;
+
+  [1, 2].forEach((player) => {
+    if (!isShieldActive(player)) return;
+
+    const home = state.homes[player - 1];
+    if (!home) return;
+
+    const centreX = home.x + home.width / 2;
+    const centreY = home.height - 26;
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 220);
+    const radiusX = 52 + pulse * 3;
+    const radiusY = 92 + pulse * 4;
+
+    ctx.save();
+    ctx.globalAlpha = 0.14 + pulse * 0.1;
+    ctx.fillStyle = "#4FC3F7";
+    ctx.beginPath();
+    ctx.ellipse(centreX, centreY, radiusX, radiusY, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = "#81D4FA";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.ellipse(centreX, centreY, radiusX, radiusY, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Soft inner glow so the bubble reads even on a dark sky
+    ctx.globalAlpha = 0.18;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.ellipse(centreX, centreY, radiusX - 3, radiusY - 3, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// Ripple left behind when a shield soaks up a missile
+function drawShieldRipples() {
+  if (!state.shieldRipples || !state.shieldRipples.length) return;
+
+  state.shieldRipples = state.shieldRipples
+    .map((ripple) => ({ ...ripple, life: ripple.life - 0.06 }))
+    .filter((ripple) => ripple.life > 0);
+
+  state.shieldRipples.forEach((ripple) => {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, ripple.life) * 0.8;
+    ctx.strokeStyle = "#4FC3F7";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(ripple.x, ripple.y, (1 - ripple.life) * 55 + 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// Missile body, nose pointing along +x before rotation
+function drawMissile(angle) {
+  ctx.save();
+  ctx.rotate(angle);
+
+  const flicker = 0.7 + Math.random() * 0.5;
+
+  // Exhaust flame
+  ctx.fillStyle = "rgba(255, 152, 0, 0.95)";
+  ctx.beginPath();
+  ctx.moveTo(-15, -4);
+  ctx.lineTo(-15 - 17 * flicker, 0);
+  ctx.lineTo(-15, 4);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255, 235, 59, 0.95)";
+  ctx.beginPath();
+  ctx.moveTo(-15, -2);
+  ctx.lineTo(-15 - 9 * flicker, 0);
+  ctx.lineTo(-15, 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Body
+  ctx.fillStyle = "#B0BEC5";
+  ctx.beginPath();
+  ctx.moveTo(17, 0);
+  ctx.lineTo(7, -6);
+  ctx.lineTo(-15, -6);
+  ctx.lineTo(-15, 6);
+  ctx.lineTo(7, 6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Nose cone
+  ctx.fillStyle = "#E53935";
+  ctx.beginPath();
+  ctx.moveTo(17, 0);
+  ctx.lineTo(7, -6);
+  ctx.lineTo(7, 6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Fins
+  ctx.fillStyle = "#78909C";
+  ctx.beginPath();
+  ctx.moveTo(-15, -6);
+  ctx.lineTo(-21, -12);
+  ctx.lineTo(-10, -6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-15, 6);
+  ctx.lineTo(-21, 12);
+  ctx.lineTo(-10, 6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Porthole
+  ctx.fillStyle = "#4FC3F7";
+  ctx.beginPath();
+  ctx.arc(2, 0, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// Smoke trail behind a flying missile
+function drawMissileTrail() {
+  if (state.phase !== "in flight" || state.throwSkill !== "rocket") return;
+
+  const trail = state.bomb.trail || [];
+  trail.forEach((point, index) => {
+    const t = index / Math.max(1, trail.length);
+    ctx.save();
+    ctx.globalAlpha = 0.06 + t * 0.45;
+    ctx.fillStyle = settings.mode === "dark" ? "#CFD8DC" : "#ECEFF1";
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 2 + t * 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
 function drawGorilla(player) {
   ctx.save();
 
-  const building =
-    player === 1
-      ? state.buildings.at(1) // Second building
-      : state.buildings.at(-2); // Second last building
+  const building = state.homes[player - 1];
+  if (!building) {
+    ctx.restore();
+    return;
+  }
 
   ctx.translate(building.x + building.width / 2, building.height);
   
@@ -847,6 +1651,16 @@ function drawGorilla(player) {
 
 // Function to initialize game options panel with selection buttons
 function initializeGameOptionsPanel() {
+  // Show how many options are available (also handy to spot a stale cache)
+  const charactersHeading = document.getElementById("characters-heading");
+  if (charactersHeading) {
+    charactersHeading.textContent = `Characters (${gameOptions.characters.length})`;
+  }
+  const terrainsHeading = document.getElementById("terrains-heading");
+  if (terrainsHeading) {
+    terrainsHeading.textContent = `Terrains (${gameOptions.terrains.length})`;
+  }
+
   // Create player character selection headers
   const player1Header = document.createElement('div');
   player1Header.className = 'player-header player1-header';
@@ -905,6 +1719,8 @@ function initializeGameOptionsPanel() {
       
       // Update settings for Player 1
       settings.player1Character = character.id;
+      savePreferences();
+      SoundEngine.playClick();
       
       // Also update global character if it's Player 1's turn
       if (state.currentPlayer === 1) {
@@ -973,6 +1789,8 @@ function initializeGameOptionsPanel() {
       
       // Update settings for Player 2
       settings.player2Character = character.id;
+      savePreferences();
+      SoundEngine.playClick();
       
       // Also update global character if it's Player 2's turn
       if (state.currentPlayer === 2) {
@@ -1074,6 +1892,8 @@ function initializeGameOptionsPanel() {
       
       // Update settings
       settings.terrain = terrain.id;
+      savePreferences();
+      SoundEngine.playClick();
       
       // Rebuild the game world with the new terrain
       updateBuildingsForTerrain();
@@ -1124,6 +1944,8 @@ function initializeGameOptionsPanel() {
       
       // Update settings
       settings.ball = ball.id;
+      savePreferences();
+      SoundEngine.playClick();
     });
   });
   
@@ -1159,6 +1981,8 @@ function initializeGameOptionsPanel() {
       
       // Update settings
       settings.effect = effect.id;
+      savePreferences();
+      SoundEngine.playClick();
     });
   });
 }
@@ -1181,23 +2005,22 @@ function updateBuildingsForTerrain() {
   // Get the selected terrain
   const terrain = gameOptions.terrains.find(t => t.id === settings.terrain);
   if (!terrain) return;
-  
-  // Reset buildings
-  state.buildings = [];
-  
-  // Generate buildings with the selected terrain's building generator
-  for (let i = 0; i < 8; i++) {
-    const previousBuilding = state.buildings[i - 1];
-    const building = terrain.generateBuilding(i, previousBuilding);
-    state.buildings.push(building);
-  }
-  
+
+  // Rebuild both castles (this also clears the holes blown into the old one)
+  generateCastleWorld();
+
   // Update scale and shift
   calculateScaleAndShift();
-  
-  // Reset gorilla positions
+
+  // Reset gorilla + windmill positions
   initializeBombPosition();
   initializeWindmillPosition();
+
+  // Clear keyboard aim so the next throw starts from a sane default
+  lastAim[0] = { angle: 45, speed: 90 };
+  lastAim[1] = { angle: 45, speed: 90 };
+
+  builtTerrain = settings.terrain;
 }
 
 // No longer needed as we're using the image instead
@@ -1220,33 +2043,32 @@ function drawRoundedRect(context, x, y, width, height, radius) {
   return context;
 }
 
-// Draw explosion effect at the given position
-function drawExplosionEffect(x, y) {
-  // Find the selected effect
-  const selectedEffect = gameOptions.effects.find(effect => effect.id === settings.effect);
-  
+// Draw the impact effect at the given position (world coordinates)
+function drawExplosionEffect(x, y, size = 30) {
+  const selectedEffect = gameOptions.effects.find(
+    (effect) => effect.id === settings.effect
+  );
+
   if (!selectedEffect) return;
-  
-  // Create explosion animation
+
   let effectProgress = 0;
-  let animationId;
-  
+
   function animateEffect() {
-    // Draw the selected effect
-    selectedEffect.draw(ctx, x, y, 30, effectProgress);
-    
-    // Update progress
+    // The scene is repainted every frame, so the effect does not smear
+    // and it is drawn with the same flipped/scaled coordinate system.
+    draw(() => selectedEffect.draw(ctx, x, y, size, effectProgress));
+
     effectProgress += 0.05;
-    
-    // Continue animation until complete
+
     if (effectProgress <= 1) {
-      animationId = requestAnimationFrame(animateEffect);
+      effectAnimationID = requestAnimationFrame(animateEffect);
     } else {
-      cancelAnimationFrame(animationId);
+      cancelAnimationFrame(effectAnimationID);
+      effectAnimationID = undefined;
+      draw(); // clean up the last frame
     }
   }
-  
-  // Start the animation
+
   animateEffect();
 }
 
@@ -1300,6 +2122,12 @@ function drawGorillaThoughtBubbles(player) {
 }
 
 function drawBomb() {
+  // The aiming guides must stay visible on both the dark and light sky
+  const guideColor =
+    settings.mode === "dark"
+      ? "rgba(255, 255, 255, 0.75)"
+      : "rgba(25, 25, 45, 0.55)";
+
   ctx.save();
   ctx.translate(state.bomb.x, state.bomb.y);
 
@@ -1308,7 +2136,7 @@ function drawBomb() {
     ctx.translate(-state.bomb.velocity.x / 6.25, -state.bomb.velocity.y / 6.25);
 
     // Draw throwing trajectory
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.strokeStyle = guideColor;
     ctx.setLineDash([3, 8]);
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -1318,8 +2146,18 @@ function drawBomb() {
 
     // Get selected ball
     const selectedBall = gameOptions.balls.find(ball => ball.id === settings.ball);
-    
-    if (selectedBall) {
+
+    if (state.activeSkill === "rocket") {
+      // A missile follows the aim instead of a ball
+      const speed = Math.hypot(state.bomb.velocity.x, state.bomb.velocity.y);
+      const aimAngle =
+        speed > 1
+          ? Math.atan2(state.bomb.velocity.y, state.bomb.velocity.x)
+          : state.currentPlayer === 1
+            ? 0
+            : Math.PI;
+      drawMissile(aimAngle);
+    } else if (selectedBall) {
       // Draw the selected ball for aiming
       selectedBall.draw(ctx, 0); // 0 rotation for aiming
     } else {
@@ -1329,11 +2167,24 @@ function drawBomb() {
       ctx.arc(0, 0, 6, 0, 2 * Math.PI);
       ctx.fill();
     }
+
+    // Ring around the bomb while a special skill is armed
+    if (state.activeSkill && SKILLS[state.activeSkill]) {
+      ctx.strokeStyle = SKILLS[state.activeSkill].color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(0, 0, 13, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
   } else if (state.phase === "in flight") {
     // Get selected ball
     const selectedBall = gameOptions.balls.find(ball => ball.id === settings.ball);
-    
-    if (selectedBall) {
+
+    if (state.throwSkill === "rocket") {
+      // Missile points where it is actually flying
+      drawMissile(Math.atan2(state.bomb.velocity.y, state.bomb.velocity.x));
+    } else if (selectedBall) {
       // Draw the selected ball in flight
       selectedBall.draw(ctx, state.bomb.rotation);
     } else {
@@ -1368,7 +2219,7 @@ function drawBomb() {
   // Indicator showing if the bomb is above the screen
   if (state.bomb.y > window.innerHeight / state.scale) {
     ctx.beginPath();
-    ctx.strokeStyle = "white";
+    ctx.strokeStyle = guideColor;
     const distance = state.bomb.y - window.innerHeight / state.scale;
     ctx.moveTo(state.bomb.x, window.innerHeight / state.scale - 10);
     ctx.lineTo(state.bomb.x, window.innerHeight / state.scale - distance);
@@ -1382,7 +2233,7 @@ function drawBomb() {
   // Indicator showing the starting position of the bomb
   if (state.bomb.highlight) {
     ctx.beginPath();
-    ctx.strokeStyle = "white";
+    ctx.strokeStyle = guideColor;
     ctx.lineWidth = 2;
     ctx.moveTo(state.bomb.x, state.bomb.y + 20);
     ctx.lineTo(state.bomb.x, state.bomb.y + 120);
@@ -1396,97 +2247,100 @@ function drawBomb() {
 
 // Mouse and Touch Event handlers
 function handleDragStart(clientX, clientY) {
+  if (state.phase !== "aiming") return;
+
+  // Ignore aiming while the computer is playing
+  if (settings.numberOfPlayers === 0) return;
+  if (settings.numberOfPlayers === 1 && state.currentPlayer === 2) return;
+
   hideInstructions();
-  if (state.phase === "aiming") {
-    isDragging = true;
-    document.body.style.cursor = "grabbing";
+  isDragging = true;
+  document.body.style.cursor = "grabbing";
 
-    // Calculate the direction and velocity based on pointer position
-    const rect = canvas.getBoundingClientRect();
-    const pointerX = (clientX - rect.left) * window.devicePixelRatio;
-    const pointerY = (clientY - rect.top) * window.devicePixelRatio;
+  // Store raw client coordinates: the delta is what matters, and mixing
+  // CSS pixels with devicePixelRatio broke aiming on retina screens.
+  dragStartX = clientX;
+  dragStartY = clientY;
+}
 
-    // Calculate center position of the current building
-    const building =
-      state.currentPlayer === 1
-        ? state.buildings.at(1)
-        : state.buildings.at(-2);
+function updateAimFromPointer(clientX, clientY) {
+  const deltaX = clientX - dragStartX;
+  const deltaY = clientY - dragStartY;
 
-    const buildingCenterX = building.x + building.width / 2;
-    const buildingTop = building.height;
+  state.bomb.velocity.x = -deltaX;
+  state.bomb.velocity.y = deltaY;
+  setInfo(deltaX, deltaY);
 
-    dragStartX = pointerX;
-    dragStartY = pointerY;
+  lastAim[state.currentPlayer - 1] = currentAim();
+
+  draw();
+}
+
+function endDrag() {
+  if (!isDragging) return;
+  isDragging = false;
+  document.body.style.cursor = "default";
+
+  // A tap without dragging should not fire a random shot
+  if (Math.hypot(state.bomb.velocity.x, state.bomb.velocity.y) < 6) {
+    initializeBombPosition();
+    draw();
+    return;
   }
+
+  throwBomb();
 }
 
 // Mouse event handlers
 bombGrabAreaDOM.addEventListener("mousedown", function (e) {
+  e.preventDefault();
   handleDragStart(e.clientX, e.clientY);
 });
 
-// Touch event handlers
-bombGrabAreaDOM.addEventListener("touchstart", function (e) {
-  // Prevent default to avoid scrolling while dragging
-  e.preventDefault();
-  if (e.touches && e.touches[0]) {
-    handleDragStart(e.touches[0].clientX, e.touches[0].clientY);
-  }
-});
-
 window.addEventListener("mousemove", function (e) {
-  if (isDragging) {
-    let deltaX = e.clientX - dragStartX;
-    let deltaY = e.clientY - dragStartY;
-
-    state.bomb.velocity.x = -deltaX;
-    state.bomb.velocity.y = deltaY;
-    setInfo(deltaX, deltaY);
-
-    draw();
-  }
+  if (isDragging) updateAimFromPointer(e.clientX, e.clientY);
 });
 
-// Touch event handlers
-bombGrabAreaDOM.addEventListener("touchmove", function (e) {
-  // Prevent default to avoid scrolling while dragging
-  e.preventDefault();
-  if (e.touches && e.touches[0]) {
-    if (isDragging) {
-      let deltaX = e.touches[0].clientX - dragStartX;
-      let deltaY = e.touches[0].clientY - dragStartY;
-
-      state.bomb.velocity.x = -deltaX;
-      state.bomb.velocity.y = deltaY;
-      setInfo(deltaX, deltaY);
-
-      draw();
-    }
-  }
-});
-
-// Mouse event handlers
 window.addEventListener("mouseup", function () {
-  if (isDragging) {
-    isDragging = false;
-    document.body.style.cursor = "default";
-
-    throwBomb();
-  }
+  endDrag();
 });
 
-// Touch event handlers
-bombGrabAreaDOM.addEventListener("touchend", function () {
-  if (isDragging) {
-    isDragging = false;
-    document.body.style.cursor = "default";
+// Touch event handlers - listening on window keeps the drag alive even
+// when the finger leaves the small grab area
+bombGrabAreaDOM.addEventListener(
+  "touchstart",
+  function (e) {
+    e.preventDefault();
+    if (e.touches && e.touches[0]) {
+      handleDragStart(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  },
+  { passive: false }
+);
 
-    throwBomb();
-  }
+window.addEventListener(
+  "touchmove",
+  function (e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    if (e.touches && e.touches[0]) {
+      updateAimFromPointer(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  },
+  { passive: false }
+);
+
+window.addEventListener("touchend", function () {
+  endDrag();
+});
+
+window.addEventListener("touchcancel", function () {
+  endDrag();
 });
 
 function setInfo(deltaX, deltaY) {
   const hypotenuse = Math.sqrt(deltaX ** 2 + deltaY ** 2);
+  if (hypotenuse === 0) return;
   const angleInRadians = Math.asin(deltaY / hypotenuse);
   const angleInDegrees = (angleInRadians / Math.PI) * 180;
 
@@ -1499,16 +2353,86 @@ function setInfo(deltaX, deltaY) {
   }
 }
 
-window.addEventListener("mouseup", function () {
-  if (isDragging) {
-    isDragging = false;
-    document.body.style.cursor = "default";
+// ------------------------------------------------------------
+// Keyboard aiming: arrow keys + space (great on laptops/trackpads)
+// ------------------------------------------------------------
+function isHumanTurn() {
+  if (gameOptionsPanel && gameOptionsPanel.style.display === "block") return false;
+  if (state.phase !== "aiming") return false;
+  if (settings.numberOfPlayers === 0) return false;
+  if (settings.numberOfPlayers === 1 && state.currentPlayer === 2) return false;
+  return true;
+}
 
-    throwBomb();
+// Read the current angle/speed from the bomb velocity
+function currentAim() {
+  const velocity = state.bomb.velocity;
+  const speed = Math.hypot(velocity.x, velocity.y);
+
+  if (speed < 1) {
+    return { ...lastAim[state.currentPlayer - 1] };
+  }
+
+  const angle = (Math.atan2(Math.abs(velocity.y), Math.abs(velocity.x)) * 180) / Math.PI;
+  return { angle, speed };
+}
+
+function applyAim(angle, speed) {
+  // Keep the shot inside sensible limits
+  angle = Math.min(89, Math.max(0, angle));
+  speed = Math.min(220, Math.max(10, speed));
+
+  const radians = (angle * Math.PI) / 180;
+  const direction = state.currentPlayer === 1 ? 1 : -1;
+
+  state.bomb.velocity.x = Math.cos(radians) * speed * direction;
+  state.bomb.velocity.y = Math.sin(radians) * speed;
+
+  lastAim[state.currentPlayer - 1] = { angle, speed };
+  setInfo(-state.bomb.velocity.x, state.bomb.velocity.y);
+  hideInstructions();
+  draw();
+}
+
+const AIM_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Enter"];
+
+window.addEventListener("keydown", function (event) {
+  if (!AIM_KEYS.includes(event.key)) return;
+  if (!isHumanTurn()) return;
+
+  event.preventDefault();
+  const aim = currentAim();
+
+  switch (event.key) {
+    case "ArrowUp":
+      applyAim(aim.angle + 2, aim.speed);
+      break;
+    case "ArrowDown":
+      applyAim(aim.angle - 2, aim.speed);
+      break;
+    case "ArrowRight":
+      applyAim(aim.angle, aim.speed + 5);
+      break;
+    case "ArrowLeft":
+      applyAim(aim.angle, aim.speed - 5);
+      break;
+    case " ":
+    case "Enter":
+      if (Math.hypot(state.bomb.velocity.x, state.bomb.velocity.y) < 1) {
+        applyAim(aim.angle, aim.speed);
+      }
+      throwBomb();
+      break;
   }
 });
 
 function computerThrow() {
+  // The computer may protect itself before spending an offensive skill
+  computerMaybeShield();
+
+  // The computer may spend one of its special skills
+  state.pendingSkill = chooseComputerSkill();
+
   const numberOfSimulations = 2 + state.round * 3;
   const bestThrow = runSimulations(numberOfSimulations);
 
@@ -1533,11 +2457,8 @@ function runSimulations(numberOfSimulations) {
   };
   simulationMode = true;
 
-  // Calculating the center position of the enemy
-  const enemyBuilding =
-    state.currentPlayer === 1
-      ? state.buildings.at(-2) // Second last building
-      : state.buildings.at(1); // Second building
+  // Calculating the center position of the enemy's keep
+  const enemyBuilding = state.homes[state.currentPlayer === 1 ? 1 : 0];
   const enemyX = enemyBuilding.x + enemyBuilding.width / 2;
   const enemyY = enemyBuilding.height + 30;
 
@@ -1575,6 +2496,26 @@ function runSimulations(numberOfSimulations) {
 }
 
 function throwBomb() {
+  // Guard against extra throws (double taps, input after the game ended)
+  if (!simulationMode && state.phase !== "aiming") return;
+
+  // Attach and spend the special skill for this throw
+  if (!simulationMode) {
+    const chosen = state.activeSkill || state.pendingSkill || null;
+    const pool = state.skills[state.currentPlayer - 1];
+
+    if (chosen && pool && pool[chosen] > 0) {
+      state.throwSkill = chosen;
+      pool[chosen] -= 1;
+    } else {
+      state.throwSkill = null;
+    }
+
+    state.activeSkill = null;
+    state.pendingSkill = null;
+    renderSkills();
+  }
+
   // Reset hit tracking for both players at the start of each throw
   state.players[0].wasHitThisThrow = false;
   state.players[1].wasHitThisThrow = false;
@@ -1587,7 +2528,13 @@ function throwBomb() {
     previousAnimationTimestamp = undefined;
     animationFrameRequestID = requestAnimationFrame(animate);
   }
-  playThrowSound();
+  if (!simulationMode) {
+    if (state.throwSkill === "rocket") {
+      SoundEngine.playMissile();
+    } else {
+      SoundEngine.playThrow();
+    }
+  }
 }
 
 function animate(timestamp) {
@@ -1620,55 +2567,45 @@ function animate(timestamp) {
       // Draw explosion effect at the exact hit location
       const hitX = state.lastHitPoint ? state.lastHitPoint.x : state.bomb.x;
       const hitY = state.lastHitPoint ? state.lastHitPoint.y : state.bomb.y;
-      drawExplosionEffect(hitX, hitY);
-      playHitSound();
+      const throwSkill = SKILLS[state.throwSkill];
+      state.shake = throwSkill ? throwSkill.shake : 12;
+      drawExplosionEffect(
+        hitX,
+        hitY,
+        throwSkill ? throwSkill.explosionSize : 30
+      );
+      if (throwSkill) {
+        addBlastScars(hitX, hitY, throwSkill.blastRadius, throwSkill.blastHoles);
+      }
+      if (state.throwSkill === "nuke") triggerFlash();
+      SoundEngine.playExplosion(
+        state.throwSkill === "nuke" ? 3 : state.throwSkill === "rocket" ? 2 : 1
+      );
     }
 
     // Handle the case when we hit a building or the bomb got off-screen
-    if (miss) {
-      state.currentPlayer = state.currentPlayer === 1 ? 2 : 1; // Switch players
-      if (state.currentPlayer === 1) state.round++;
-      state.phase = "aiming";
-      initializeBombPosition();
+    const enemyPlayer = state.currentPlayer === 1 ? 2 : 1;
+    const enemyDefeated =
+      hit && state.players[enemyPlayer - 1].health <= 0;
 
+    // The gorilla stands on the roof, so a bomb can touch the gorilla and
+    // the building at the same time. A defeat always wins over a miss.
+    if (enemyDefeated) {
+      state.phase = "celebrating";
+      announceWinner();
       draw();
-
-      const computerThrowsNext =
-        settings.numberOfPlayers === 0 ||
-        (settings.numberOfPlayers === 1 && state.currentPlayer === 2);
-
-      if (computerThrowsNext) setTimeout(computerThrow, 50);
-
       return;
     }
 
-    // Handle the case when we hit the enemy
-    if (hit) {
-      const enemyPlayer = state.currentPlayer === 1 ? 2 : 1;
-      const playerIndex = enemyPlayer - 1;
-      
-      if (state.players[playerIndex].health <= 0) {
-        // Enemy defeated
-        state.phase = "celebrating";
-        announceWinner();
-        draw();
-        return;
-      } else {
-        // Enemy hit but not defeated - switch turns
-        state.currentPlayer = state.currentPlayer === 1 ? 2 : 1; // Switch players
-        if (state.currentPlayer === 1) state.round++;
-        state.phase = "aiming";
-        initializeBombPosition();
-        draw();
-        
-        const computerThrowsNext =
-          settings.numberOfPlayers === 0 ||
-          (settings.numberOfPlayers === 1 && state.currentPlayer === 2);
+    if (miss) {
+      endTurn(50);
+      return;
+    }
 
-        if (computerThrowsNext) setTimeout(computerThrow, 1000); // Delay for hit animation
-        
-        return;
-      }
+    // Handle the case when we hit the enemy but it is not defeated yet
+    if (hit) {
+      endTurn(1000); // Delay so the hit animation is visible
+      return;
     }
   }
 
@@ -1681,6 +2618,25 @@ function animate(timestamp) {
   } else {
     animationFrameRequestID = requestAnimationFrame(animate);
   }
+}
+
+// Finish a turn: switch players and hand over to the computer if needed
+function endTurn(computerDelay) {
+  state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
+  if (state.currentPlayer === 1) state.round += 1;
+  state.phase = "aiming";
+  state.throwSkill = null;
+  state.activeSkill = null;
+  state.pendingSkill = null;
+  initializeBombPosition();
+  renderSkills();
+  draw();
+
+  const computerThrowsNext =
+    settings.numberOfPlayers === 0 ||
+    (settings.numberOfPlayers === 1 && state.currentPlayer === 2);
+
+  if (computerThrowsNext) setTimeout(computerThrow, computerDelay);
 }
 
 function moveBomb(elapsedTime) {
@@ -1699,6 +2655,12 @@ function moveBomb(elapsedTime) {
   // Rotate according to the direction
   const direction = state.currentPlayer === 1 ? -1 : +1;
   state.bomb.rotation += direction * 5 * multiplier;
+
+  // Keep a short smoke trail behind a flying missile
+  if (!simulationMode && state.throwSkill === "rocket") {
+    state.bomb.trail.push({ x: state.bomb.x, y: state.bomb.y });
+    if (state.bomb.trail.length > 60) state.bomb.trail.shift();
+  }
 }
 
 function checkFrameHit() {
@@ -1758,11 +2720,9 @@ function checkGorillaHit() {
   // Determine which player is the enemy (the one being targeted by the current player)
   const enemyPlayer = state.currentPlayer === 1 ? 2 : 1;
   
-  // Get the building where the enemy is standing
-  const enemyBuilding = enemyPlayer === 1
-    ? state.buildings.at(1) // Player 1's building (index 1)
-    : state.buildings.at(-2); // Player 2's building (second to last)
-  
+  // The enemy stands on top of their own keep
+  const enemyBuilding = state.homes[enemyPlayer - 1];
+
   if (!enemyBuilding) return false;
 
   // Define the hitbox around the character image
@@ -1793,18 +2753,33 @@ function checkGorillaHit() {
     }
     
     if (!state.players[playerIndex].wasHitThisThrow) {
-      // Reduce health when hit
-      const damage = 25; // 25% damage per hit
+      // A raised shield soaks up the whole hit and breaks
+      if (isShieldActive(enemyPlayer)) {
+        state.players[playerIndex].wasHitThisThrow = true;
+        breakShield(enemyPlayer);
+        state.lastHitPoint = {
+          x: state.bomb.x,
+          y: state.bomb.y,
+          isCharacter: true,
+          playerIndex,
+        };
+        triggerShieldRipple(state.bomb.x, state.bomb.y);
+        state.shake = 6;
+        SoundEngine.playShieldBlock();
+        renderSkills();
+        return true; // impact, but no damage
+      }
+
+      // Reduce health when hit (special skills hurt a lot more)
+      const skill = SKILLS[state.throwSkill];
+      const damage = skill ? skill.damage : 25;
       state.players[playerIndex].health = Math.max(0, state.players[playerIndex].health - damage);
       state.players[playerIndex].isHit = true;
       state.players[playerIndex].hitTimer = 30; // Animation frames
       state.players[playerIndex].wasHitThisThrow = true; // Mark as hit this throw
       
       // Play hit sound
-      if (hitSound) {
-        hitSound.currentTime = 0; // Rewind to start in case it's already playing
-        hitSound.play().catch(e => console.log('Audio play failed:', e));
-      }
+      SoundEngine.playHit();
       
       // Update health display for the HIT player (enemy)
       updateHealthDisplay(enemyPlayer, state.players[playerIndex].health);
@@ -1842,6 +2817,9 @@ function checkGorillaHit() {
 }
 
 function announceWinner() {
+  if (state.winnerAnnounced) return;
+  state.winnerAnnounced = true;
+
   if (settings.numberOfPlayers === 0) {
     winnerDOM.innerText = `Computer ${state.currentPlayer}`;
   } else if (settings.numberOfPlayers === 1 && state.currentPlayer === 1) {
@@ -1851,6 +2829,11 @@ function announceWinner() {
   } else {
     winnerDOM.innerText = `Player ${state.currentPlayer}`;
   }
+
+  // Persist the win and refresh the scoreboard + overlay
+  recordWin(state.currentPlayer);
+  renderSkills();
+  SoundEngine.playWin();
   showCongratulations();
 }
 
@@ -1861,6 +2844,8 @@ singlePlayerButtonDOM.forEach((button) =>
     name1DOM.innerText = "Player";
     name2DOM.innerText = "Computer";
 
+    SoundEngine.playClick();
+    renderScores();
     newGame();
   })
 );
@@ -1872,6 +2857,8 @@ twoPlayersButtonDOM.forEach((button) =>
     name1DOM.innerText = "Player 1";
     name2DOM.innerText = "Player 2";
 
+    SoundEngine.playClick();
+    renderScores();
     newGame();
   })
 );
@@ -1882,6 +2869,8 @@ autoPlayButtonDOM.forEach((button) =>
     name1DOM.innerText = "Computer 1";
     name2DOM.innerText = "Computer 2";
 
+    SoundEngine.playClick();
+    renderScores();
     newGame();
   })
 );
@@ -1921,32 +2910,5 @@ function toggleFullscreen() {
   }
 }
 
-// Audio elements
-let bgMusic, hitSound, throwSound;
-window.addEventListener('DOMContentLoaded', () => {
-  bgMusic = document.getElementById('bg-music');
-  hitSound = document.getElementById('hit-sound');
-  throwSound = document.getElementById('throw-sound');
-
-  // Try to play background music (user gesture required in some browsers)
-  if (bgMusic) {
-    bgMusic.volume = 0.5;
-    document.body.addEventListener('click', () => {
-      if (bgMusic.paused) bgMusic.play().catch(()=>{});
-    }, { once: true });
-  }
-});
-
-function playThrowSound() {
-  if (throwSound) {
-    throwSound.currentTime = 0;
-    throwSound.play().catch(()=>{});
-  }
-}
-
-function playHitSound() {
-  if (hitSound) {
-    hitSound.currentTime = 0;
-    hitSound.play().catch(()=>{});
-  }
-}
+// Sound effects are synthesized by sound-engine.js, so there are no
+// audio files to load and no 404s in the console.

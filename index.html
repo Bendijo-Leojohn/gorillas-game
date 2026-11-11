@@ -14,12 +14,30 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Gorillas</title>
-    <link rel="stylesheet" href="index.css" />
-    <script src="game-options.js"></script>
-    <script src="index.js" defer></script>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A6%8D%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="index.css?v=4" />
+    <script src="game-options.js?v=4"></script>
+    <script src="sound-engine.js?v=4"></script>
+    <script src="index.js?v=4" defer></script>
   </head>
   <body>
     <canvas id="game"></canvas>
+
+    <div id="scoreboard" aria-label="Scoreboard">
+      <button id="score-reset" type="button" title="Reset the score">&#8635;</button>
+      <div class="score-side">
+        <span class="score-name" id="score-left-name">You</span>
+        <span class="score-value" id="score-left">0</span>
+      </div>
+      <span class="score-separator">:</span>
+      <div class="score-side">
+        <span class="score-value" id="score-right">0</span>
+        <span class="score-name" id="score-right-name">Computer</span>
+      </div>
+    </div>
 
     <svg width="200" height="250" id="windmill">
       <defs>
@@ -49,6 +67,7 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
         <div class="health-bar player1-health"></div>
         <p>Health: <span class="health">100</span>%</p>
       </div>
+      <p>Shield: <span class="shield-time">—</span></p>
     </div>
 
     <div id="info-right">
@@ -59,18 +78,51 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
         <div class="health-bar player2-health"></div>
         <p>Health: <span class="health">100</span>%</p>
       </div>
+      <p>Shield: <span class="shield-time">—</span></p>
     </div>
 
     <div id="instructions">
       <h3 id="game-mode">Player vs. Computer</h3>
       <h1>Drag the bomb to aim!</h1>
+      <p class="control-hint">
+        Keyboard: <strong>&uarr; &darr;</strong> angle &middot;
+        <strong>&larr; &rarr;</strong> power &middot;
+        <strong>Space</strong> to throw
+      </p>
+      <p class="control-hint special-hint">
+        Pick a special below: <strong>Nuke</strong>, <strong>Missile</strong> or <strong>Shield</strong>
+      </p>
     </div>
+
+    <div id="skills-bar" aria-label="Special skills">
+      <span class="skills-label">Specials</span>
+      <button class="skill-btn" type="button" data-skill="nuke"
+        title="Nuke: 100 damage, instant knockout, huge crater (1 per game)">
+        <span class="skill-icon">&#9762;</span>
+        <span class="skill-name">Nuke</span>
+        <span class="skill-count">&times;1</span>
+      </button>
+      <button class="skill-btn" type="button" data-skill="rocket"
+        title="Missile: 45 damage, flies like a real missile with a smoke trail (2 per game)">
+        <span class="skill-icon">&#128640;</span>
+        <span class="skill-name">Missile</span>
+        <span class="skill-count">&times;2</span>
+      </button>
+      <button class="skill-btn" type="button" data-skill="shield"
+        title="Shield: blocks one hit, disappears after 10 seconds (2 per game)">
+        <span class="skill-icon">&#128737;</span>
+        <span class="skill-name">Shield</span>
+        <span class="skill-count">&times;2</span>
+      </button>
+    </div>
+
+    <div id="screen-flash"></div>
 
     <div id="bomb-grab-area"></div>
 
     <div id="congratulations">
       <h1><span id="winner">?</span> won!</h1>
-      
+      <p class="final-score">Score: <span id="final-score">0 : 0</span></p>
       <p>
         Say hello
         <a href="https://www.facebook.com/diamond08202001" target="_top"
@@ -89,14 +141,14 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
     
     <!-- Game Options Selection Panel -->
     <div id="game-options-panel">
-      <h2>Game Options</h2>
+      <h2>Game Options <span class="version-tag">v2.2</span></h2>
       <div class="options-container">
         <div class="option-section">
-          <h3>Character</h3>
+          <h3 id="characters-heading">Characters</h3>
           <div id="character-options" class="option-buttons"></div>
         </div>
         <div class="option-section">
-          <h3>Terrain</h3>
+          <h3 id="terrains-heading">Terrains</h3>
           <div id="terrain-options" class="option-buttons"></div>
         </div>
         <div class="option-section">
@@ -122,6 +174,8 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
       </div>
 
       <button id="color-mode">Dark Mode</button>
+
+      <button id="sound-toggle" type="button" title="Toggle sound">Sound On</button>
 
       <a
         id="youtube"
@@ -161,10 +215,5 @@ Follow me on 𝕏 for more: https://twitter.com/HunorBorbely
         />
       </svg>
     </button>
-    
-    <!-- Audio elements for sound effects and music -->
-    <audio id="bg-music" src="assets/music/bg-music.mp3" loop preload="auto"></audio>
-    <audio id="hit-sound" src="assets/music/hit.mp3" preload="auto"></audio>
-    <audio id="throw-sound" src="assets/music/throw.mp3" preload="auto"></audio>
   </body>
 </html>
