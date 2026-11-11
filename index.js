@@ -87,6 +87,9 @@ const CASTLE = {
   worldWidth: 1500,
 };
 
+// Vertical size of the battlefield (the scale uses this too)
+const WORLD_HEIGHT = 500;
+
 // Initialize character image
 const characterImage = new Image();
 characterImage.src = "character.png";
@@ -688,6 +691,12 @@ function newGame() {
     worldWidth: 1500,
     blastHoles: [],
 
+    // Terrain obstacles: hanging rocks, floating platforms and a ground hazard
+    obstacles: [],
+    hazard: null,
+    debris: [],
+    hazardSplash: 0,
+
     // Timed shields (epoch ms when they expire, 0 = inactive)
     shields: [{ expiresAt: 0 }, { expiresAt: 0 }],
     shieldRipples: [],
@@ -915,6 +924,74 @@ function generateCastleWorld() {
     castle.blocks.forEach((block) => state.buildings.push(block));
     state.homes.push(castle.home);
   });
+
+  // Obstacles belong to the terrain, so rebuild them with the world
+  generateObstacles();
+}
+
+// How tall the visible world is (the scale fits the width first)
+function getWorldHeight() {
+  if (!state.scale) return WORLD_HEIGHT;
+  return window.innerHeight / state.scale;
+}
+
+// Ground hazards per terrain
+const HAZARDS = {
+  lava: { label: "Lava", top: 46, color: "#FF6D00", glow: "rgba(255, 183, 77, 0.9)" },
+  water: { label: "Water", top: 40, color: "#1E88E5", glow: "rgba(129, 212, 250, 0.85)" },
+  ice: { label: "Ice", top: 28, color: "#B3E5FC", glow: "rgba(255, 255, 255, 0.8)" },
+  sand: { label: "Quicksand", top: 34, color: "#E0B252", glow: "rgba(255, 224, 130, 0.8)" },
+  cloud: { label: "Cloud Sea", top: 52, color: "#FFFFFF", glow: "rgba(255, 255, 255, 0.95)" },
+};
+
+// Build the obstacle set for the selected terrain.
+// These are real obstacles: they stop a missile mid-flight.
+function generateObstacles() {
+  const terrain = gameOptions.terrains.find(
+    (option) => option.id === settings.terrain
+  );
+  const config =
+    (terrain && terrain.obstacles) || { rocks: 0, platforms: 0, hazard: null };
+
+  state.obstacles = [];
+  state.debris = [];
+  state.hazardSplash = 0;
+
+  const hazard = config.hazard && HAZARDS[config.hazard];
+  state.hazard = hazard ? { type: config.hazard, ...hazard } : null;
+
+  // Only use the empty gap between the two castles
+  const leftEdge = CASTLE.margin + CASTLE.width + 120;
+  const rightEdge = CASTLE.worldWidth - CASTLE.margin - CASTLE.width - 120;
+  const span = Math.max(120, rightEdge - leftEdge);
+
+  for (let i = 0; i < (config.rocks || 0); i++) {
+    const width = 38 + Math.random() * 44;
+    state.obstacles.push({
+      type: "rock",
+      x: leftEdge + Math.random() * Math.max(1, span - width),
+      width,
+      length: 60 + Math.random() * 130,
+      jag: Math.random() * 2 - 1,
+    });
+  }
+
+  for (let i = 0; i < (config.platforms || 0); i++) {
+    const width = 90 + Math.random() * 80;
+    const x =
+      leftEdge + Math.random() * Math.max(1, span - width);
+    const y = 140 + Math.random() * 160;
+    state.obstacles.push({
+      type: "platform",
+      x,
+      y,
+      width,
+      thickness: 16,
+      hp: 2,
+      holes: [],
+      style: i % 2,
+    });
+  }
 }
 
 function calculateScaleAndShift() {
@@ -1040,13 +1117,16 @@ function draw(overlay) {
   // Draw scene
   drawBackgroundBuildings();
   drawBuildingsWithBlastHoles();
+  drawHazard();
   drawCastleFlags();
+  drawObstacles();
   drawGorilla(1);
   drawGorilla(2);
   drawShields();
   drawMissileTrail();
   drawBomb();
   drawShieldRipples();
+  updateAndDrawDebris();
 
   // Optional overlay (used for impact effects) - already in scene coordinates
   if (typeof overlay === "function") overlay();
@@ -1212,12 +1292,323 @@ function drawBackgroundBuildings() {
 
   // The skyline recedes into the haze so the castles read as foreground
   ctx.save();
-  ctx.globalAlpha = settings.mode === "dark" ? 0.42 : 0.5;
+  ctx.globalAlpha = settings.mode === "dark" ? 0.4 : 0.36;
   ctx.fillStyle = color;
   state.backgroundBuildings.forEach((building) => {
     ctx.fillRect(building.x, 0, building.width, building.height);
   });
   ctx.restore();
+}
+
+// Ground hazard band (lava, water, ice, quicksand or a sea of clouds)
+function drawHazard() {
+  const hazard = state.hazard;
+  if (!hazard) return;
+
+  const worldW = state.worldWidth || CASTLE.worldWidth;
+  const time = Date.now() / 650;
+
+  ctx.save();
+
+  // Body of the hazard, brighter where it meets the surface
+  const body = ctx.createLinearGradient(0, 0, 0, hazard.top);
+  body.addColorStop(0, hazard.color);
+  body.addColorStop(1, hazard.glow);
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = body;
+  ctx.fillRect(-60, 0, worldW + 120, hazard.top - 4);
+
+  // Soft glow above the surface
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = hazard.glow;
+  ctx.fillRect(-60, hazard.top - 6, worldW + 120, 6);
+
+  // Shimmering crest
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = hazard.glow;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  for (let x = -60; x <= worldW + 60; x += 12) {
+    const y = hazard.top + Math.sin(x * 0.02 + time) * 4;
+    if (x === -60) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Bubbles / sparkles on the surface
+  for (let i = 0; i < 18; i++) {
+    const bx = ((i * 337) % (worldW + 100)) - 50;
+    const by = 4 + ((i * 53) % Math.max(6, hazard.top - 10));
+    const pulse = 0.4 + 0.6 * Math.abs(Math.sin(time + i));
+    ctx.globalAlpha = 0.35 * pulse;
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    ctx.arc(bx, by, 1.5 + pulse * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Splash rings where a projectile hit the surface
+  if (state.hazardSplash && state.hazardSplash.life > 0) {
+    state.hazardSplash.life -= 0.04;
+    const splash = state.hazardSplash;
+    ctx.globalAlpha = Math.max(0, splash.life);
+    ctx.strokeStyle = hazard.glow;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(splash.x, hazard.top, (1 - splash.life) * 60 + 8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// Obstacle colours follow the current day / night mode
+function getObstaclePalette() {
+  const dark = settings.mode === "dark";
+  return {
+    rock: dark ? "#3B4653" : "#8A97A3",
+    rockShade: dark ? "#252E39" : "#6B7784",
+    slab: dark ? "#44515E" : "#A9B5BE",
+    cap: dark ? "#22303D" : "#7C8993",
+    hole: dark ? "#0A1018" : "#101820",
+  };
+}
+
+// Hanging rocks and floating platforms that block a shot
+function drawObstacles() {
+  if (!state.obstacles) return;
+
+  const palette = getObstaclePalette();
+  const rockColor = palette.rock;
+  const rockShade = palette.rockShade;
+  const slabColor = palette.slab;
+
+  state.obstacles.forEach((ob) => {
+    ctx.save();
+
+    if (ob.type === "rock") {
+      const ceiling = getWorldHeight();
+      const bottom = ceiling - ob.length;
+      const centreX = ob.x + ob.width / 2;
+
+      // Main body
+      ctx.fillStyle = rockColor;
+      ctx.beginPath();
+      ctx.moveTo(ob.x, ceiling);
+      ctx.lineTo(ob.x + ob.width, ceiling);
+      ctx.lineTo(centreX + ob.width * 0.3, bottom + ob.length * 0.32);
+      ctx.lineTo(centreX + ob.jag * ob.width * 0.12, bottom);
+      ctx.lineTo(centreX - ob.width * 0.26, bottom + ob.length * 0.26);
+      ctx.closePath();
+      ctx.fill();
+
+      // Shaded half + rim light
+      ctx.fillStyle = rockShade;
+      ctx.beginPath();
+      ctx.moveTo(ob.x + ob.width * 0.62, ceiling);
+      ctx.lineTo(ob.x + ob.width, ceiling);
+      ctx.lineTo(centreX + ob.width * 0.3, bottom + ob.length * 0.32);
+      ctx.lineTo(centreX + ob.jag * ob.width * 0.12, bottom);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ob.x + 3, ceiling);
+      ctx.lineTo(centreX - ob.width * 0.26, bottom + ob.length * 0.26);
+      ctx.lineTo(centreX + ob.jag * ob.width * 0.12, bottom);
+      ctx.stroke();
+    } else {
+      const { x, y, width, thickness } = ob;
+
+      // Slab
+      ctx.fillStyle = slabColor;
+      ctx.fillRect(x, y, width, thickness);
+
+      // Top rim and underside shadow
+      ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+      ctx.fillRect(x, y + thickness - 3, width, 3);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+      ctx.fillRect(x, y, width, 3);
+
+      // End caps so the slab does not read as a plain stick
+      ctx.fillStyle = palette.cap;
+      ctx.fillRect(x - 3, y - 2, 6, thickness + 4);
+      ctx.fillRect(x + width - 3, y - 2, 6, thickness + 4);
+
+      // Warning light hanging under the middle of the slab
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + width / 2, y);
+      ctx.lineTo(x + width / 2, y - 10);
+      ctx.stroke();
+      ctx.fillStyle = ob.style === 0 ? "#FFD54F" : "#4FC3F7";
+      ctx.beginPath();
+      ctx.arc(x + width / 2, y - 12, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bolts
+      ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+      for (let boltX = x + 10; boltX < x + width - 6; boltX += 22) {
+        ctx.beginPath();
+        ctx.arc(boltX, y + thickness / 2, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Holes punched by earlier hits
+      ob.holes.forEach((hole) => {
+        ctx.fillStyle = palette.hole;
+        ctx.beginPath();
+        ctx.arc(hole.x, hole.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(hole.x, hole.y, 16, Math.PI * 0.9, Math.PI * 1.7);
+        ctx.stroke();
+      });
+
+      // Cracks when the slab is nearly broken
+      if (ob.hp <= 1) {
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.45)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x + width * 0.3, y);
+        ctx.lineTo(x + width * 0.35, y + thickness * 0.6);
+        ctx.lineTo(x + width * 0.28, y + thickness);
+        ctx.moveTo(x + width * 0.7, y + thickness);
+        ctx.lineTo(x + width * 0.66, y + thickness * 0.5);
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  });
+}
+
+// Debris flying out of a destroyed rock or slab
+function spawnDebris(x, y, color, count) {
+  state.debris = state.debris || [];
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.8 + Math.random() * 3;
+    state.debris.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed + 0.6,
+      size: 2 + Math.random() * 4,
+      color,
+      life: 1,
+    });
+  }
+}
+
+function updateAndDrawDebris() {
+  if (!state.debris || !state.debris.length) return;
+
+  state.debris = state.debris.filter((piece) => piece.life > 0);
+
+  state.debris.forEach((piece) => {
+    piece.x += piece.vx;
+    piece.y += piece.vy;
+    piece.vy -= 0.35; // gravity pulls debris back down
+    piece.life -= 0.015;
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, piece.life);
+    ctx.fillStyle = piece.color;
+    ctx.fillRect(piece.x, piece.y, piece.size, piece.size);
+    ctx.restore();
+  });
+}
+
+function hitObstacle(obstacle, x, y) {
+  const palette = getObstaclePalette();
+
+  spawnDebris(
+    x,
+    y,
+    obstacle.type === "rock" ? palette.rock : palette.slab,
+    obstacle.type === "rock" ? 12 : 8
+  );
+
+  if (obstacle.type === "rock") {
+    state.obstacles = state.obstacles.filter((item) => item !== obstacle);
+    return;
+  }
+
+  obstacle.hp -= 1;
+  obstacle.holes.push({
+    x: Math.max(obstacle.x + 16, Math.min(obstacle.x + obstacle.width - 16, x)),
+    y,
+  });
+
+  if (obstacle.hp <= 0) {
+    state.obstacles = state.obstacles.filter((item) => item !== obstacle);
+  }
+}
+
+// Did the projectile hit an obstacle, a platform or the ground hazard?
+function checkObstacleHit() {
+  if (!state.obstacles) return false;
+
+  // Ground hazard works like the floor of the battlefield
+  if (state.hazard && state.bomb.y < state.hazard.top) {
+    if (!simulationMode) {
+      state.bomb.y = state.hazard.top + 2;
+      state.hazardSplash = { x: state.bomb.x, life: 1 };
+      state.lastHitPoint = {
+        x: state.bomb.x,
+        y: state.hazard.top + 2,
+        isHazard: true,
+      };
+    }
+    return true;
+  }
+
+  for (let i = 0; i < state.obstacles.length; i++) {
+    const obstacle = state.obstacles[i];
+    let hit = false;
+
+    if (obstacle.type === "rock") {
+      const depth = getWorldHeight() - state.bomb.y;
+      if (depth >= 0 && depth <= obstacle.length) {
+        const taper = 1 - (depth / obstacle.length) * 0.7;
+        const halfWidth = (obstacle.width / 2) * taper;
+        const centreX = obstacle.x + obstacle.width / 2;
+        hit = Math.abs(state.bomb.x - centreX) <= halfWidth;
+      }
+    } else if (
+      state.bomb.x >= obstacle.x - 4 &&
+      state.bomb.x <= obstacle.x + obstacle.width + 4 &&
+      state.bomb.y >= obstacle.y - 4 &&
+      state.bomb.y <= obstacle.y + obstacle.thickness + 4
+    ) {
+      // A hole punched by an earlier missile lets the next one through
+      hit = !obstacle.holes.some((hole) => {
+        const dx = hole.x - state.bomb.x;
+        const dy = hole.y - state.bomb.y;
+        return Math.sqrt(dx * dx + dy * dy) < 16;
+      });
+    }
+
+    if (!hit) continue;
+
+    if (!simulationMode) {
+      state.lastHitPoint = {
+        x: state.bomb.x,
+        y: state.bomb.y,
+        isObstacle: true,
+      };
+      hitObstacle(obstacle, state.bomb.x, state.bomb.y);
+    }
+    return true;
+  }
+
+  return false;
 }
 
 function drawBuildingsWithBlastHoles() {
@@ -1659,6 +2050,16 @@ function initializeGameOptionsPanel() {
   const terrainsHeading = document.getElementById("terrains-heading");
   if (terrainsHeading) {
     terrainsHeading.textContent = `Terrains (${gameOptions.terrains.length})`;
+  }
+
+  const ballsHeading = document.getElementById("balls-heading");
+  if (ballsHeading) {
+    ballsHeading.textContent = `Projectile (${gameOptions.balls.length})`;
+  }
+
+  const effectsHeading = document.getElementById("effects-heading");
+  if (effectsHeading) {
+    effectsHeading.textContent = `Effects (${gameOptions.effects.length})`;
   }
 
   // Create player character selection headers
@@ -2554,7 +2955,9 @@ function animate(timestamp) {
     // Hit detection - store results to avoid multiple calls
     const hitFrame = checkFrameHit();
     const hitBuilding = checkBuildingHit();
-    const miss = hitFrame || hitBuilding; // Bomb got off-screen or hit a building
+    const hitObstacle = checkObstacleHit();
+    // Bomb got off-screen, hit a building, a rock, a platform or a hazard
+    const miss = hitFrame || hitBuilding || hitObstacle;
     const hit = checkGorillaHit(); // Bomb hit the enemy
 
     if (simulationMode && (hit || miss)) {
@@ -2562,8 +2965,8 @@ function animate(timestamp) {
       return; // Simulation ended, return from the loop
     }
     
-    // Draw explosion effect if hit or building hit
-    if (!simulationMode && (hit || hitBuilding)) {
+    // Draw explosion effect if the shot hit anything solid
+    if (!simulationMode && (hit || hitBuilding || hitObstacle)) {
       // Draw explosion effect at the exact hit location
       const hitX = state.lastHitPoint ? state.lastHitPoint.x : state.bomb.x;
       const hitY = state.lastHitPoint ? state.lastHitPoint.y : state.bomb.y;

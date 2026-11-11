@@ -22,11 +22,29 @@ This build adds a few upgrades on top of the tutorial game:
     player takes **no damage** from the next hit — the bubble ripples, pops and
     the shield is gone. The computer raises its own shield when it is hurt or
     when it sees a charged nuke, and the HUD dims while it is not your turn.
-- **10 characters and 12 terrains** to choose from in *Game Options*:
+- **Terrain obstacles that really block a shot** – every terrain now has its
+  own obstacle set, spawned in the gap between the two castles:
+  - **Hanging rocks / stalactites** drop from the ceiling and stop a missile.
+    A hit shatters them into debris and clears the path.
+  - **Floating platforms** block the arc from both sides. Each hit punches a
+    visible hole you can shoot through next time; a second hit breaks the slab
+    apart completely.
+  - **Ground hazards** – lava, water, ice, quicksand or a sea of clouds.
+    A missile that lands there explodes on the surface with splash rings
+    instead of quietly flying off-screen.
+- **10 characters, 15 projectiles and 10 impact effects** in *Game Options*.
+  New throwables: **Shuriken, Boomerang, Coconut, Water Balloon, Meteor and
+  Bowling Ball** (plus Banana, Bomb, Ninja Star, Fireball, Comet, Bazooka,
+  Apple, Snowball and Anvil).
+  New effects: **Lightning, Smoke Puff, Confetti, Shatter Shards and
+  Ring Pulse** (plus Classic Explosion, Starburst, Blood Splatter, Pixelated
+  and Shockwave).
+- **17 terrains** to choose from in *Game Options*:
   Classic Gorilla, Robot, Alien, Ninja, Pirate, Robot Cat, Knight, Wizard,
   Dino, Yeti — across City, Mountains, Futuristic City, Mountain Range,
   Ocean Islands, Bedrock Caverns, Desert, Candyland, Neon City, Jungle,
-  Arctic and Volcano.
+  Arctic, Volcano, **Space Station, Underwater Reef, Cherry Blossom,
+  Graveyard and Sky Islands**.
 - **Sound effects + background music** are synthesized with the Web Audio API
   (`sound-engine.js`), so there are no `.mp3` files to load and no 404s.
   Use the **Sound On / Muted** button in the toolbar to mute everything.
@@ -55,6 +73,7 @@ This build adds a few upgrades on top of the tutorial game:
 | Aim | Drag the bomb / gorilla hand, or `↑` `↓` `←` `→` |
 | Throw | Release the drag, or press `Space` |
 | Use a special | Click **Nuke** / **Missile** / **Shield** in the bottom bar, then throw |
+| Break an obstacle | Hit a hanging rock or a floating platform with any shot |
 | Game options | Character, terrain, projectile and effect pickers in the toolbar |
 | Sound | **Sound On / Muted** button |
 | Reset score | ↻ next to the scoreboard |
