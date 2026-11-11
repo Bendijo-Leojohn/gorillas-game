@@ -735,7 +735,6 @@ function draw(overlay) {
   ctx.scale(state.scale, state.scale);
 
   // Draw scene
-  drawBackgroundMoon();
   drawBackgroundBuildings();
   drawBuildingsWithBlastHoles();
   drawGorilla(1);
@@ -848,26 +847,6 @@ function drawBird(ctx, x, y, size, wing) {
   ctx.lineTo(x - size * 0.4, y - Math.abs(Math.sin(wing + 1)) * size * 0.5);
   ctx.stroke();
   ctx.restore();
-}
-
-function drawBackgroundMoon() {
-  if (settings.mode === "dark") {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-    ctx.beginPath();
-    ctx.arc(
-      window.innerWidth / state.scale - state.shift - 200,
-      window.innerHeight / state.scale - 100,
-      30,
-      0,
-      2 * Math.PI
-    );
-    ctx.fill();
-  } else {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-    ctx.beginPath();
-    ctx.arc(300, 350, 60, 0, 2 * Math.PI);
-    ctx.fill();
-  }
 }
 
 function drawBackgroundBuildings() {
@@ -1509,6 +1488,12 @@ function drawGorillaThoughtBubbles(player) {
 }
 
 function drawBomb() {
+  // The aiming guides must stay visible on both the dark and light sky
+  const guideColor =
+    settings.mode === "dark"
+      ? "rgba(255, 255, 255, 0.75)"
+      : "rgba(25, 25, 45, 0.55)";
+
   ctx.save();
   ctx.translate(state.bomb.x, state.bomb.y);
 
@@ -1517,7 +1502,7 @@ function drawBomb() {
     ctx.translate(-state.bomb.velocity.x / 6.25, -state.bomb.velocity.y / 6.25);
 
     // Draw throwing trajectory
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.strokeStyle = guideColor;
     ctx.setLineDash([3, 8]);
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -1577,7 +1562,7 @@ function drawBomb() {
   // Indicator showing if the bomb is above the screen
   if (state.bomb.y > window.innerHeight / state.scale) {
     ctx.beginPath();
-    ctx.strokeStyle = "white";
+    ctx.strokeStyle = guideColor;
     const distance = state.bomb.y - window.innerHeight / state.scale;
     ctx.moveTo(state.bomb.x, window.innerHeight / state.scale - 10);
     ctx.lineTo(state.bomb.x, window.innerHeight / state.scale - distance);
@@ -1591,7 +1576,7 @@ function drawBomb() {
   // Indicator showing the starting position of the bomb
   if (state.bomb.highlight) {
     ctx.beginPath();
-    ctx.strokeStyle = "white";
+    ctx.strokeStyle = guideColor;
     ctx.lineWidth = 2;
     ctx.moveTo(state.bomb.x, state.bomb.y + 20);
     ctx.lineTo(state.bomb.x, state.bomb.y + 120);
